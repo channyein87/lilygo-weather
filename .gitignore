@@ -1,0 +1,41 @@
+# Virtual environment
+venv/
+env/
+ENV/
+
+# PlatformIO
+.pio/
+.pioenvs/
+.piolibdeps/
+build/
+*.elf
+*.bin
+*.map
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Project-specific
+temp/
+*.log
+*.tmp
+*.out
+*.hex
+
+# OS
+.DS_Store
+Thumbs.db
