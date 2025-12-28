@@ -3,16 +3,30 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
+#include <LittleFS.h>
 
 /*
  * LILYGO T5 4.7" E-Paper Display - Weather Display
  * 
  * Connects to WiFi and fetches weather data from OpenWeatherMap API
  * Displays current weather, temperature, and forecast on e-paper display
+ * 
+ * Configuration is read from config.json (stored in LittleFS)
  */
 
 // ===== CONFIGURATION =====
-// Edit these settings for your setup
+// WiFi credentials (loaded from config.json)
+String ssid = "";
+String password = "";
+
+// OpenWeatherMap API (loaded from config.json)
+String api_key = "";
+String city = "";
+String country_code = "";
+String units = "";
+
+// Update interval (in milliseconds) - default 5 minutes
+unsigned long UPDATE_INTERVAL = 300000;
 
 // Display dimensions
 #define EPD_DISPLAY_WIDTH 960
@@ -20,19 +34,6 @@
 
 // Framebuffer for grayscale image (4 bits per pixel)
 uint8_t *framebuffer = NULL;
-
-// WiFi credentials
-const char* ssid = "Burmese";
-const char* password = "sonesone87";
-
-// OpenWeatherMap API
-const char* api_key = "ae6bbea13ff0bac412f6f90226852318";           // Get from openweathermap.org
-const char* city = "Sydney";                     // City name
-const char* country_code = "AU";                // Country code (ISO 3166)
-const char* units = "metric";                   // "metric" for Celsius, "imperial" for Fahrenheit
-
-// Update interval (in milliseconds) - 5 minutes (300000 ms)
-const unsigned long UPDATE_INTERVAL = 300000;
 
 // ===== GLOBALS =====
 unsigned long last_update = 0;
@@ -49,6 +50,13 @@ void setup() {
     
     Serial.println("\n\n=== LILYGO T5 Weather Display ===");
     Serial.println("Starting up...");
+
+    // Load configuration from JSON file
+    if (!loadConfig()) {
+        Serial.println("ERROR: Failed to load config.json!");
+        Serial.println("Please create config.json based on config.template.json");
+        while (1) delay(1000);
+    }
 
     // Allocate framebuffer (4 bits per pixel = EPD_WIDTH * EPD_HEIGHT / 2)
     framebuffer = (uint8_t *)ps_calloc(sizeof(uint8_t), EPD_DISPLAY_WIDTH * EPD_DISPLAY_HEIGHT / 2);
@@ -139,7 +147,7 @@ void connectToWiFi() {
     Serial.println(ssid);
     
     WiFi.mode(WIFI_STA);
-    WiFi.begin(ssid, password);
+    WiFi.begin(ssid.c_str(), password.c_str());
     
     int attempts = 0;
     while (WiFi.status() != WL_CONNECTED && attempts < 20) {
@@ -222,7 +230,7 @@ void displayWeather() {
     
     // Line 1: City
     cursor_x = 20;
-    writeln((GFXfont *)&FiraSans, city, &cursor_x, &cursor_y, NULL);
+    writeln((GFXfont *)&FiraSans, city.c_str(), &cursor_x, &cursor_y, NULL);
     cursor_y += 60;
     
     // Line 2: Temperature
@@ -249,4 +257,68 @@ void displayWeather() {
     cursor_x = 20;
     snprintf(display_buffer, sizeof(display_buffer), "Wind: %s", wind_speed.c_str());
     writeln((GFXfont *)&FiraSans, display_buffer, &cursor_x, &cursor_y, NULL);
+}
+
+bool loadConfig() {
+    Serial.println("Loading config.json...");
+    
+    // Initialize LittleFS
+    if (!LittleFS.begin()) {
+        Serial.println("ERROR: Failed to mount LittleFS");
+        return false;
+    }
+    
+    // Check if config.json exists
+    if (!LittleFS.exists("/config.json")) {
+        Serial.println("ERROR: config.json not found");
+        Serial.println("Please upload config.json to the device");
+        return false;
+    }
+    
+    // Read config.json
+    File configFile = LittleFS.open("/config.json", "r");
+    if (!configFile) {
+        Serial.println("ERROR: Could not open config.json");
+        return false;
+    }
+    
+    // Parse JSON
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, configFile);
+    configFile.close();
+    
+    if (error) {
+        Serial.print("ERROR: JSON parsing failed: ");
+        Serial.println(error.c_str());
+        return false;
+    }
+    
+    // Extract WiFi config
+    ssid = doc["wifi"]["ssid"].as<String>();
+    password = doc["wifi"]["password"].as<String>();
+    
+    // Extract weather config
+    api_key = doc["weather"]["api_key"].as<String>();
+    city = doc["weather"]["city"].as<String>();
+    country_code = doc["weather"]["country"].as<String>();
+    units = doc["weather"]["units"].as<String>();
+    
+    // Extract update interval (convert minutes to milliseconds)
+    int update_minutes = doc["update_interval_minutes"] | 5;
+    UPDATE_INTERVAL = update_minutes * 60 * 1000;
+    
+    // Validate loaded config
+    if (ssid.isEmpty() || password.isEmpty() || api_key.isEmpty() || city.isEmpty()) {
+        Serial.println("ERROR: Incomplete configuration in config.json");
+        return false;
+    }
+    
+    Serial.println("Config loaded successfully!");
+    Serial.print("City: ");
+    Serial.println(city);
+    Serial.print("Update interval: ");
+    Serial.print(update_minutes);
+    Serial.println(" minutes");
+    
+    return true;
 }

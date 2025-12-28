@@ -1,0 +1,13 @@
+{
+  "wifi": {
+    "ssid": "YOUR_WIFI_SSID",
+    "password": "YOUR_WIFI_PASSWORD"
+  },
+  "weather": {
+    "api_key": "YOUR_OPENWEATHERMAP_API_KEY",
+    "city": "Sydney",
+    "country": "AU",
+    "units": "metric"
+  },
+  "update_interval_minutes": 5
+}
