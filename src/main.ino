@@ -1,5 +1,6 @@
 #include <epd_driver.h>
-#include <firasans.h>
+#include "lexend18.h"
+#include "lexend40.h"
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
@@ -85,19 +86,19 @@ void setup() {
     // Show initialization message
     cursor_x = 300;
     cursor_y = 100;
-    writeln((GFXfont *)&FiraSans, "Weather Display", &cursor_x, &cursor_y, NULL);
+    writeln((GFXfont *)&Lexend18, "Weather Display", &cursor_x, &cursor_y, NULL);
     
     // Connect to WiFi
     cursor_x = 200;
     cursor_y = 200;
-    writeln((GFXfont *)&FiraSans, "Connecting to WiFi...", &cursor_x, &cursor_y, NULL);
+    writeln((GFXfont *)&Lexend18, "Connecting to WiFi...", &cursor_x, &cursor_y, NULL);
     connectToWiFi();
     
     // Stop if WiFi connection failed
     if (WiFi.status() != WL_CONNECTED) {
         int cursor_x = 10;
         int cursor_y = 50;
-        writeln((GFXfont *)&FiraSans, "WiFi Connection Failed", &cursor_x, &cursor_y, NULL);
+        writeln((GFXfont *)&Lexend18, "WiFi Connection Failed", &cursor_x, &cursor_y, NULL);
         epd_poweroff_all();
         while (1) {
             delay(1000);  // Halt execution
@@ -222,41 +223,45 @@ void fetchWeatherData() {
 void displayWeather() {
     Serial.println("Displaying weather...");
     
-    int cursor_x = 20;
-    int cursor_y = 40;
-    
     // Use a single buffer to avoid heap fragmentation
     char display_buffer[200];
     
-    // Line 1: City
-    cursor_x = 20;
-    writeln((GFXfont *)&FiraSans, city.c_str(), &cursor_x, &cursor_y, NULL);
-    cursor_y += 60;
+    // LEFT COLUMN: City and Temperature
+    int left_x = 20;
+    int left_y = 80;
     
-    // Line 2: Temperature
-    cursor_x = 20;
-    writeln((GFXfont *)&FiraSans, current_temp.c_str(), &cursor_x, &cursor_y, NULL);
-    cursor_y += 60;
+    // City (large font)
+    writeln((GFXfont *)&Lexend40, city.c_str(), &left_x, &left_y, NULL);
     
-    // Line 3: Condition
-    cursor_x = 20;
-    writeln((GFXfont *)&FiraSans, current_condition.c_str(), &cursor_x, &cursor_y, NULL);
-    cursor_y += 60;
+    // Temperature (large font)
+    left_x = 20;
+    left_y += 100;
+    writeln((GFXfont *)&Lexend40, current_temp.c_str(), &left_x, &left_y, NULL);
     
-    // Line 4-6: Combined weather details
-    cursor_x = 20;
+    // RIGHT COLUMN: Condition and details
+    int right_x = 500;
+    int right_y = 80;
+
+    // Condition
+    writeln((GFXfont *)&Lexend18, current_condition.c_str(), &right_x, &right_y, NULL);
+
+    // Feels like
+    right_x = 500;
+    right_y += 80;
     snprintf(display_buffer, sizeof(display_buffer), "Feels: %s", feels_like.c_str());
-    writeln((GFXfont *)&FiraSans, display_buffer, &cursor_x, &cursor_y, NULL);
-    cursor_y += 60;
-    
-    cursor_x = 20;
+    writeln((GFXfont *)&Lexend18, display_buffer, &right_x, &right_y, NULL);
+
+    // Humidity
+    right_x = 500;
+    right_y += 60;
     snprintf(display_buffer, sizeof(display_buffer), "Humidity: %s", current_humidity.c_str());
-    writeln((GFXfont *)&FiraSans, display_buffer, &cursor_x, &cursor_y, NULL);
-    cursor_y += 60;
-    
-    cursor_x = 20;
+    writeln((GFXfont *)&Lexend18, display_buffer, &right_x, &right_y, NULL);
+
+    // Wind
+    right_x = 500;
+    right_y += 60;
     snprintf(display_buffer, sizeof(display_buffer), "Wind: %s", wind_speed.c_str());
-    writeln((GFXfont *)&FiraSans, display_buffer, &cursor_x, &cursor_y, NULL);
+    writeln((GFXfont *)&Lexend18, display_buffer, &right_x, &right_y, NULL);
 }
 
 bool loadConfig() {
