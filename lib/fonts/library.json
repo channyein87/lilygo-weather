@@ -1,0 +1,17 @@
+{
+  "name": "fonts",
+  "version": "1.0.0",
+  "description": "Custom fonts for LILYGO weather display",
+  "keywords": ["fonts", "epd", "display"],
+  "authors": [
+    {
+      "name": "Chan Nyein Ko Ko"
+    }
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/channyein87/lilygo-weather.git"
+  },
+  "frameworks": "arduino",
+  "platforms": "*"
+}

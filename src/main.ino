@@ -1,8 +1,8 @@
 #include <epd_driver.h>
-#include "lexend10.h"
-#include "lexend18.h"
-#include "lexend32.h"
-#include "lexend40.h"
+#include <lexend10.h>
+#include <lexend18.h>
+#include <lexend32.h>
+#include <lexend40.h>
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
@@ -255,7 +255,7 @@ void displayWeather() {
     get_text_bounds((GFXfont *)&Lexend18, (current_day + " " + current_date).c_str(), &xx, &yy, &x1, &y1, &w, &h, NULL);
     int date_x = left_x - w / 2;
     int date_y = left_y + h;
-    int date_y = left_y + h;
+    writeln((GFXfont *)&Lexend18, (current_day + " " + current_date).c_str(), &date_x, &date_y, NULL);
     
     // City (large font)
     left_x = 240;
