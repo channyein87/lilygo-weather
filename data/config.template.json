@@ -9,5 +9,9 @@
     "country": "AU",
     "units": "metric"
   },
+  "ntp": {
+    "server": "au.pool.ntp.org",
+    "timezone": "Australia/Sydney"
+  },
   "update_interval_minutes": 5
 }

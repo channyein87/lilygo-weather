@@ -6,6 +6,7 @@
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include <LittleFS.h>
+#include <time.h>
 
 /*
  * LILYGO T5 4.7" E-Paper Display - Weather Display
@@ -27,6 +28,10 @@ String city = "";
 String country_code = "";
 String units = "";
 
+// NTP Configuration (loaded from config.json)
+String ntp_server = "";
+String timezone = "";
+
 // Update interval (in milliseconds) - default 5 minutes
 unsigned long UPDATE_INTERVAL = 300000;
 
@@ -44,6 +49,10 @@ String current_condition = "Loading...";
 String current_humidity = "--";
 String wind_speed = "--";
 String feels_like = "--";
+String temp_max = "--";
+String temp_min = "--";
+String current_date = "---";
+String current_day = "---";
 
 void setup() {
     // Initialize serial for debugging
@@ -105,6 +114,9 @@ void setup() {
             delay(1000);  // Halt execution
         }
     }
+
+    // Sync time with NTP server
+    syncTime();
 
     // Clear the screen
     epd_clear();
@@ -202,6 +214,8 @@ void fetchWeatherData() {
             feels_like = String((float)doc["main"]["feels_like"], 0) + "°C";
             current_humidity = String((int)doc["main"]["humidity"]) + "%";
             wind_speed = String((float)doc["wind"]["speed"], 0) + " m/s";
+            temp_max = String((float)doc["main"]["temp_max"], 0);
+            temp_min = String((float)doc["main"]["temp_min"], 0);
             
             // Get weather condition safely
             const char* weather = doc["weather"][0]["main"] | "Unknown";
@@ -224,17 +238,29 @@ void fetchWeatherData() {
 void displayWeather() {
     Serial.println("Displaying weather...");
     
+    // Update date and time
+    updateDate();
+    
     // Use a single buffer to avoid heap fragmentation
     char display_buffer[200];
     
     // LEFT COLUMN: City and Temperature
     int left_x = 240;
-    int left_y = 100;
+    int left_y = 60;
+    
+    // Display date at top of left column
+    int x1, y1;
+    int w, h;
+    int xx = left_x, yy = 50;
+    get_text_bounds((GFXfont *)&Lexend18, (current_day + " " + current_date).c_str(), &xx, &yy, &x1, &y1, &w, &h, NULL);
+    int date_x = left_x - w / 2;
+    int date_y = 50 + h;
+    writeln((GFXfont *)&Lexend18, (current_day + " " + current_date).c_str(), &date_x, &date_y, NULL);
     
     // City (large font)
-    int x1, y1; //the bounds of x,y and w and h of the variable 'text' in pixels.
-    int w, h;
-    int xx = left_x, yy = left_y;
+    left_x = 240;
+    left_y += 80;
+    xx = left_x, yy = left_y;
     get_text_bounds((GFXfont *)&Lexend32, city.c_str(), &xx, &yy, &x1, &y1, &w, &h, NULL);
     int city_x = left_x - w / 2;
     int city_y = left_y + h;
@@ -248,6 +274,16 @@ void displayWeather() {
     int tmp_x = left_x - w / 2;
     int tmp_y = left_y + h;
     writeln((GFXfont *)&Lexend40, current_temp.c_str(), &tmp_x, &tmp_y, NULL);
+    
+    // High/Low temperature
+    left_x = 240;
+    left_y += 80;
+    snprintf(display_buffer, sizeof(display_buffer), "H %s - L %s", temp_max.c_str(), temp_min.c_str());
+    xx = left_x, yy = left_y;
+    get_text_bounds((GFXfont *)&Lexend18, display_buffer, &xx, &yy, &x1, &y1, &w, &h, NULL);
+    int tmpr_x = left_x - w / 2;
+    int tmpr_y = left_y + h;
+    writeln((GFXfont *)&Lexend18, display_buffer, &tmpr_x, &tmpr_y, NULL);
     
     // RIGHT COLUMN: Condition and details
     int right_x = 500;
@@ -273,6 +309,56 @@ void displayWeather() {
     right_y += 60;
     snprintf(display_buffer, sizeof(display_buffer), "Wind: %s", wind_speed.c_str());
     writeln((GFXfont *)&Lexend18, display_buffer, &right_x, &right_y, NULL);
+}
+
+void syncTime() {
+    Serial.println("Syncing time with NTP server...");
+    
+    // Configure time with NTP server and timezone
+    configTime(0, 0, ntp_server.c_str());
+    
+    // Set the timezone
+    setenv("TZ", timezone.c_str(), 1);
+    tzset();
+    
+    // Wait for time to be set
+    Serial.print("Waiting for NTP time sync: ");
+    time_t now = time(nullptr);
+    int attempts = 0;
+    while (now < 24 * 3600 && attempts < 30) {
+        delay(500);
+        Serial.print(".");
+        now = time(nullptr);
+        attempts++;
+    }
+    Serial.println();
+    
+    if (now > 24 * 3600) {
+        Serial.println("Time synchronized!");
+    } else {
+        Serial.println("WARNING: Could not sync time with NTP server");
+    }
+}
+
+void updateDate() {
+    // Get current time
+    time_t now = time(nullptr);
+    struct tm* timeinfo = localtime(&now);
+    
+    // Format: "Tue 30 Dec"
+    char day_buffer[4];
+    char date_buffer[12];
+    
+    strftime(day_buffer, sizeof(day_buffer), "%a", timeinfo);
+    strftime(date_buffer, sizeof(date_buffer), "%d %b", timeinfo);
+    
+    current_day = day_buffer;
+    current_date = date_buffer;
+    
+    Serial.print("Current date/time: ");
+    Serial.print(current_day);
+    Serial.print(" ");
+    Serial.println(current_date);
 }
 
 bool loadConfig() {
@@ -319,12 +405,17 @@ bool loadConfig() {
     country_code = doc["weather"]["country"].as<String>();
     units = doc["weather"]["units"].as<String>();
     
+    // Extract NTP config
+    ntp_server = doc["ntp"]["server"].as<String>();
+    timezone = doc["ntp"]["timezone"].as<String>();
+    
     // Extract update interval (convert minutes to milliseconds)
     int update_minutes = doc["update_interval_minutes"] | 5;
     UPDATE_INTERVAL = update_minutes * 60 * 1000;
     
     // Validate loaded config
-    if (ssid.isEmpty() || password.isEmpty() || api_key.isEmpty() || city.isEmpty()) {
+    if (ssid.isEmpty() || password.isEmpty() || api_key.isEmpty() || city.isEmpty() || 
+        ntp_server.isEmpty() || timezone.isEmpty()) {
         Serial.println("ERROR: Incomplete configuration in config.json");
         return false;
     }
