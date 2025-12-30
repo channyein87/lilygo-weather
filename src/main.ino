@@ -1,5 +1,6 @@
 #include <epd_driver.h>
 #include "lexend18.h"
+#include "lexend32.h"
 #include "lexend40.h"
 #include <WiFi.h>
 #include <HTTPClient.h>
@@ -197,10 +198,10 @@ void fetchWeatherData() {
         
         if (!error) {
             // Extract weather data
-            current_temp = String((float)doc["main"]["temp"], 1) + "°C";
-            feels_like = String((float)doc["main"]["feels_like"], 1) + "°C";
+            current_temp = String((float)doc["main"]["temp"], 0) + "°C";
+            feels_like = String((float)doc["main"]["feels_like"], 0) + "°C";
             current_humidity = String((int)doc["main"]["humidity"]) + "%";
-            wind_speed = String((float)doc["wind"]["speed"], 1) + " m/s";
+            wind_speed = String((float)doc["wind"]["speed"], 0) + " m/s";
             
             // Get weather condition safely
             const char* weather = doc["weather"][0]["main"] | "Unknown";
@@ -227,16 +228,26 @@ void displayWeather() {
     char display_buffer[200];
     
     // LEFT COLUMN: City and Temperature
-    int left_x = 20;
-    int left_y = 80;
+    int left_x = 240;
+    int left_y = 100;
     
     // City (large font)
-    writeln((GFXfont *)&Lexend40, city.c_str(), &left_x, &left_y, NULL);
+    int x1, y1; //the bounds of x,y and w and h of the variable 'text' in pixels.
+    int w, h;
+    int xx = left_x, yy = left_y;
+    get_text_bounds((GFXfont *)&Lexend32, city.c_str(), &xx, &yy, &x1, &y1, &w, &h, NULL);
+    int city_x = left_x - w / 2;
+    int city_y = left_y + h;
+    writeln((GFXfont *)&Lexend32, city.c_str(), &city_x, &city_y, NULL);
     
     // Temperature (large font)
-    left_x = 20;
-    left_y += 100;
-    writeln((GFXfont *)&Lexend40, current_temp.c_str(), &left_x, &left_y, NULL);
+    left_x = 240;
+    left_y += 140;
+    xx = left_x, yy = left_y;
+    get_text_bounds((GFXfont *)&Lexend40, current_temp.c_str(), &xx, &yy, &x1, &y1, &w, &h, NULL);
+    int tmp_x = left_x - w / 2;
+    int tmp_y = left_y + h;
+    writeln((GFXfont *)&Lexend40, current_temp.c_str(), &tmp_x, &tmp_y, NULL);
     
     // RIGHT COLUMN: Condition and details
     int right_x = 500;
@@ -247,7 +258,7 @@ void displayWeather() {
 
     // Feels like
     right_x = 500;
-    right_y += 80;
+    right_y += 60;
     snprintf(display_buffer, sizeof(display_buffer), "Feels: %s", feels_like.c_str());
     writeln((GFXfont *)&Lexend18, display_buffer, &right_x, &right_y, NULL);
 
