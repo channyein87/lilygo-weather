@@ -1,4 +1,5 @@
 #include <epd_driver.h>
+#include "lexend10.h"
 #include "lexend18.h"
 #include "lexend32.h"
 #include "lexend40.h"
@@ -247,15 +248,14 @@ void displayWeather() {
     // LEFT COLUMN: City and Temperature
     int left_x = 240;
     int left_y = 60;
+    int x1, y1, w, h;
     
     // Display date at top of left column
-    int x1, y1;
-    int w, h;
-    int xx = left_x, yy = 50;
+    int xx = left_x, yy = left_y;
     get_text_bounds((GFXfont *)&Lexend18, (current_day + " " + current_date).c_str(), &xx, &yy, &x1, &y1, &w, &h, NULL);
     int date_x = left_x - w / 2;
-    int date_y = 50 + h;
-    writeln((GFXfont *)&Lexend18, (current_day + " " + current_date).c_str(), &date_x, &date_y, NULL);
+    int date_y = left_y + h;
+    int date_y = left_y + h;
     
     // City (large font)
     left_x = 240;
@@ -309,6 +309,17 @@ void displayWeather() {
     right_y += 60;
     snprintf(display_buffer, sizeof(display_buffer), "Wind: %s", wind_speed.c_str());
     writeln((GFXfont *)&Lexend18, display_buffer, &right_x, &right_y, NULL);
+
+    // BOTTOM: Last updated timestamp
+    tzset();  // Ensure timezone is applied
+    time_t now = time(nullptr);
+    struct tm* timeinfo = localtime(&now);
+    char time_buffer[30];
+    strftime(time_buffer, sizeof(time_buffer), "Update: %d %b %Y @ %H:%M", timeinfo);
+    
+    left_x = 20;
+    left_y = EPD_DISPLAY_HEIGHT - 20;
+    writeln((GFXfont *)&Lexend10, time_buffer, &left_x, &left_y, NULL);
 }
 
 void syncTime() {
