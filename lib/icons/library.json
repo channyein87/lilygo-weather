@@ -1,0 +1,17 @@
+{
+  "name": "icons",
+  "version": "1.0.0",
+  "description": "Custom icons for LILYGO weather display",
+  "keywords": ["icons", "epd", "display"],
+  "authors": [
+    {
+      "name": "Chan Nyein Ko Ko"
+    }
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/channyein87/lilygo-weather.git"
+  },
+  "frameworks": "arduino",
+  "platforms": "*"
+}

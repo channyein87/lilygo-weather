@@ -1,13 +1,34 @@
 #include <epd_driver.h>
 #include <lexend10.h>
 #include <lexend18.h>
+#include <lexend28.h>
 #include <lexend32.h>
 #include <lexend40.h>
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include <LittleFS.h>
-#include <time.h>
+#include <Timezone.h>
+
+// Weather icons
+#include <owm_01d.h>
+#include <owm_01n.h>
+#include <owm_02d.h>
+#include <owm_02n.h>
+#include <owm_03d.h>
+#include <owm_03n.h>
+#include <owm_04d.h>
+#include <owm_04n.h>
+#include <owm_09d.h>
+#include <owm_09n.h>
+#include <owm_10d.h>
+#include <owm_10n.h>
+#include <owm_11d.h>
+#include <owm_11n.h>
+#include <owm_13d.h>
+#include <owm_13n.h>
+#include <owm_50d.h>
+#include <owm_50n.h>
 
 /*
  * LILYGO T5 4.7" E-Paper Display - Weather Display
@@ -33,6 +54,12 @@ String units = "";
 String ntp_server = "";
 String timezone = "";
 
+// Australia Eastern Time Zone (Sydney, Melbourne) - DST aware
+// AEDT: UTC+11 (Oct to Apr), AEST: UTC+10 (Apr to Oct)
+TimeChangeRule aEDT = {"AEDT", First, Sun, Oct, 2, 660};    // UTC + 11 hours
+TimeChangeRule aEST = {"AEST", First, Sun, Apr, 3, 600};    // UTC + 10 hours
+Timezone ausET(aEDT, aEST);
+
 // Update interval (in milliseconds) - default 5 minutes
 unsigned long UPDATE_INTERVAL = 300000;
 
@@ -54,6 +81,59 @@ String temp_max = "--";
 String temp_min = "--";
 String current_date = "---";
 String current_day = "---";
+String current_icon_code = "01d";  // Default to clear day icon
+
+// Structure to hold icon data and dimensions
+struct IconData {
+    const uint8_t *data;
+    uint16_t width;
+    uint16_t height;
+};
+
+// Get icon data based on icon code from API (e.g., "01d", "02n", etc.)
+IconData getIconData(const String &icon_code) {
+    // Map icon codes to their respective data and dimensions
+    if (icon_code == "01d") {
+        return {owm_01d_data, owm_01d_width, owm_01d_height};
+    } else if (icon_code == "01n") {
+        return {owm_01n_data, owm_01n_width, owm_01n_height};
+    } else if (icon_code == "02d") {
+        return {owm_02d_data, owm_02d_width, owm_02d_height};
+    } else if (icon_code == "02n") {
+        return {owm_02n_data, owm_02n_width, owm_02n_height};
+    } else if (icon_code == "03d") {
+        return {owm_03d_data, owm_03d_width, owm_03d_height};
+    } else if (icon_code == "03n") {
+        return {owm_03n_data, owm_03n_width, owm_03n_height};
+    } else if (icon_code == "04d") {
+        return {owm_04d_data, owm_04d_width, owm_04d_height};
+    } else if (icon_code == "04n") {
+        return {owm_04n_data, owm_04n_width, owm_04n_height};
+    } else if (icon_code == "09d") {
+        return {owm_09d_data, owm_09d_width, owm_09d_height};
+    } else if (icon_code == "09n") {
+        return {owm_09n_data, owm_09n_width, owm_09n_height};
+    } else if (icon_code == "10d") {
+        return {owm_10d_data, owm_10d_width, owm_10d_height};
+    } else if (icon_code == "10n") {
+        return {owm_10n_data, owm_10n_width, owm_10n_height};
+    } else if (icon_code == "11d") {
+        return {owm_11d_data, owm_11d_width, owm_11d_height};
+    } else if (icon_code == "11n") {
+        return {owm_11n_data, owm_11n_width, owm_11n_height};
+    } else if (icon_code == "13d") {
+        return {owm_13d_data, owm_13d_width, owm_13d_height};
+    } else if (icon_code == "13n") {
+        return {owm_13n_data, owm_13n_width, owm_13n_height};
+    } else if (icon_code == "50d") {
+        return {owm_50d_data, owm_50d_width, owm_50d_height};
+    } else if (icon_code == "50n") {
+        return {owm_50n_data, owm_50n_width, owm_50n_height};
+    } else {
+        // Default fallback to clear day icon
+        return {owm_01d_data, owm_01d_width, owm_01d_height};
+    }
+}
 
 void setup() {
     // Initialize serial for debugging
@@ -222,6 +302,12 @@ void fetchWeatherData() {
             const char* weather = doc["weather"][0]["main"] | "Unknown";
             current_condition = weather;
             
+            // Get weather icon code from API response (e.g., "01d", "02n", etc.)
+            const char* icon = doc["weather"][0]["icon"] | "01d";
+            current_icon_code = icon;
+            
+            Serial.print("Weather icon code: ");
+            Serial.println(current_icon_code);
             Serial.println("Weather data parsed successfully");
         } else {
             Serial.println("JSON parsing error");
@@ -247,28 +333,45 @@ void displayWeather() {
     
     // LEFT COLUMN: City and Temperature
     int left_x = 240;
-    int left_y = 60;
+    int left_y = 20;
     int x1, y1, w, h;
-    
-    // Display date at top of left column
     int xx = left_x, yy = left_y;
-    get_text_bounds((GFXfont *)&Lexend18, (current_day + " " + current_date).c_str(), &xx, &yy, &x1, &y1, &w, &h, NULL);
-    int date_x = left_x - w / 2;
-    int date_y = left_y + h;
-    writeln((GFXfont *)&Lexend18, (current_day + " " + current_date).c_str(), &date_x, &date_y, NULL);
     
+    // // Display date at top of left column
+    // get_text_bounds((GFXfont *)&Lexend28, (current_day + " " + current_date).c_str(), &xx, &yy, &x1, &y1, &w, &h, NULL);
+    // int date_x = left_x - w / 2;
+    // int date_y = left_y + h;
+    // writeln((GFXfont *)&Lexend28, (current_day + " " + current_date).c_str(), &date_x, &date_y, NULL);
+
     // City (large font)
-    left_x = 240;
-    left_y += 80;
-    xx = left_x, yy = left_y;
-    get_text_bounds((GFXfont *)&Lexend32, city.c_str(), &xx, &yy, &x1, &y1, &w, &h, NULL);
+    // left_x = 240;
+    // left_y += 40;
+    // xx = left_x, yy = left_y;
+    get_text_bounds((GFXfont *)&Lexend28, city.c_str(), &xx, &yy, &x1, &y1, &w, &h, NULL);
     int city_x = left_x - w / 2;
     int city_y = left_y + h;
-    writeln((GFXfont *)&Lexend32, city.c_str(), &city_x, &city_y, NULL);
+    writeln((GFXfont *)&Lexend28, city.c_str(), &city_x, &city_y, NULL);
     
+    // Draw icon based on weather condition
+    left_x = 190;
+    left_y += 100;
+    
+    // Get the appropriate icon data based on API response
+    IconData icon = getIconData(current_icon_code);
+    
+    Rect_t area = {
+        .x = left_x,
+        .y = left_y,
+        .width = icon.width,
+        .height = icon.height,
+    };
+    epd_draw_grayscale_image(area, (uint8_t *)icon.data);
+    epd_draw_image(area, (uint8_t *)icon.data, BLACK_ON_WHITE);
+
     // Temperature (large font)
     left_x = 240;
-    left_y += 140;
+    left_y += 120;
+    // left_y = 300;
     xx = left_x, yy = left_y;
     get_text_bounds((GFXfont *)&Lexend40, current_temp.c_str(), &xx, &yy, &x1, &y1, &w, &h, NULL);
     int tmp_x = left_x - w / 2;
@@ -289,13 +392,21 @@ void displayWeather() {
     int right_x = 500;
     int right_y = 80;
 
+    // // City
+    // writeln((GFXfont *)&Lexend28, city.c_str(), &right_x, &right_y, NULL);
+
+    // Day date
+    writeln((GFXfont *)&Lexend28, (current_day + " " + current_date).c_str(), &right_x, &right_y, NULL);
+
     // Condition
+    right_x = 500;
+    right_y += 80;
     writeln((GFXfont *)&Lexend18, current_condition.c_str(), &right_x, &right_y, NULL);
 
     // Feels like
     right_x = 500;
     right_y += 60;
-    snprintf(display_buffer, sizeof(display_buffer), "Feels: %s", feels_like.c_str());
+    snprintf(display_buffer, sizeof(display_buffer), "Feels like: %s", feels_like.c_str());
     writeln((GFXfont *)&Lexend18, display_buffer, &right_x, &right_y, NULL);
 
     // Humidity
@@ -311,9 +422,11 @@ void displayWeather() {
     writeln((GFXfont *)&Lexend18, display_buffer, &right_x, &right_y, NULL);
 
     // BOTTOM: Last updated timestamp
-    tzset();  // Ensure timezone is applied
-    time_t now = time(nullptr);
-    struct tm* timeinfo = localtime(&now);
+    time_t utc = time(nullptr);
+    TimeChangeRule *tcr;
+    time_t local = ausET.toLocal(utc, &tcr);
+    
+    struct tm *timeinfo = localtime(&local);
     char time_buffer[30];
     strftime(time_buffer, sizeof(time_buffer), "Update: %d %b %Y @ %H:%M", timeinfo);
     
@@ -324,37 +437,53 @@ void displayWeather() {
 
 void syncTime() {
     Serial.println("Syncing time with NTP server...");
+    Serial.print("Timezone: ");
+    Serial.println(timezone);
     
-    // Configure time with NTP server and timezone
+    // Configure NTP sync with UTC
     configTime(0, 0, ntp_server.c_str());
-    
-    // Set the timezone
-    setenv("TZ", timezone.c_str(), 1);
-    tzset();
     
     // Wait for time to be set
     Serial.print("Waiting for NTP time sync: ");
-    time_t now = time(nullptr);
+    time_t utc = time(nullptr);
     int attempts = 0;
-    while (now < 24 * 3600 && attempts < 30) {
+    while (utc < 24 * 3600 && attempts < 30) {
         delay(500);
         Serial.print(".");
-        now = time(nullptr);
+        utc = time(nullptr);
         attempts++;
     }
     Serial.println();
     
-    if (now > 24 * 3600) {
+    if (utc > 24 * 3600) {
         Serial.println("Time synchronized!");
+        
+        // Convert UTC to local time using Timezone library
+        TimeChangeRule *tcr;
+        time_t local = ausET.toLocal(utc, &tcr);
+        
+        // Print current time in local timezone
+        char time_buffer[50];
+        snprintf(time_buffer, sizeof(time_buffer), "Local time: %d-%02d-%02d %02d:%02d:%02d %s",
+                 year(local), month(local), day(local),
+                 hour(local), minute(local), second(local),
+                 tcr->abbrev);
+        Serial.println(time_buffer);
     } else {
         Serial.println("WARNING: Could not sync time with NTP server");
     }
 }
 
 void updateDate() {
-    // Get current time
-    time_t now = time(nullptr);
-    struct tm* timeinfo = localtime(&now);
+    // Get current UTC time from system clock
+    time_t utc = time(nullptr);
+    
+    // Convert to local time using Timezone library
+    TimeChangeRule *tcr;
+    time_t local = ausET.toLocal(utc, &tcr);
+    
+    // Convert to struct tm for easier manipulation
+    struct tm *timeinfo = localtime(&local);
     
     // Format: "Tue 30 Dec"
     char day_buffer[4];
