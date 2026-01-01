@@ -13,5 +13,9 @@
     "server": "au.pool.ntp.org",
     "timezone": "Australia/Sydney"
   },
+  "crypto": {
+    "api_key": "YOUR_COINGECKO_API_KEY",
+    "symbol": "btc"
+  },
   "update_interval_minutes": 5
 }

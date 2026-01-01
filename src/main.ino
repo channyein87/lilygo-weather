@@ -1,5 +1,6 @@
 #include <epd_driver.h>
 #include <lexend10.h>
+#include <lexend14.h>
 #include <lexend18.h>
 #include <lexend28.h>
 #include <lexend32.h>
@@ -45,7 +46,7 @@ String ssid = "";
 String password = "";
 
 // OpenWeatherMap API (loaded from config.json)
-String api_key = "";
+String owm_api_key = "";
 String city = "";
 String country_code = "";
 String units = "";
@@ -53,6 +54,10 @@ String units = "";
 // NTP Configuration (loaded from config.json)
 String ntp_server = "";
 String timezone = "";
+
+// CoinGecko API (loaded from config.json)
+String coingecko_api_key = "";
+String crypto_symbol = "";
 
 // Australia Eastern Time Zone (Sydney, Melbourne) - DST aware
 // AEDT: UTC+11 (Oct to Apr), AEST: UTC+10 (Apr to Oct)
@@ -82,6 +87,10 @@ String temp_min = "--";
 String current_date = "---";
 String current_day = "---";
 String current_icon_code = "01d";  // Default to clear day icon
+
+// Crypto data
+String crypto_price = "--";
+String crypto_change = "--";
 
 // Structure to hold icon data and dimensions
 struct IconData {
@@ -205,6 +214,9 @@ void setup() {
     // Fetch weather data
     fetchWeatherData();
     
+    // Fetch crypto data
+    fetchCryptoData();
+    
     // Display weather
     displayWeather();
     
@@ -225,6 +237,7 @@ void loop() {
         
         // Fetch and display
         fetchWeatherData();
+        fetchCryptoData();
         displayWeather();
         
         // Power down
@@ -273,7 +286,7 @@ void fetchWeatherData() {
     // Build API URL
     String url = String("https://api.openweathermap.org/data/2.5/weather?q=") + 
                  city + "," + country_code + 
-                 "&appid=" + api_key + 
+                 "&appid=" + owm_api_key + 
                  "&units=" + units;
     
     HTTPClient http;
@@ -317,6 +330,76 @@ void fetchWeatherData() {
         Serial.print("HTTP Error: ");
         Serial.println(httpCode);
         current_condition = "API Error";
+    }
+    
+    http.end();
+}
+
+void fetchCryptoData() {
+    if (WiFi.status() != WL_CONNECTED) {
+        Serial.println("WiFi not connected, skipping crypto update");
+        crypto_price = "No WiFi";
+        crypto_change = "N/A";
+        return;
+    }
+    
+    Serial.println("Fetching crypto data...");
+    
+    // Build API URL - convert symbol to lowercase for API
+    String symbol_lower = crypto_symbol;
+    symbol_lower.toLowerCase();
+    
+    String url = String("https://api.coingecko.com/api/v3/simple/price?vs_currencies=usd&symbols=") + 
+                 symbol_lower + 
+                 "&include_24hr_change=true";
+    
+    Serial.println("Crypto API: " + url);
+
+    HTTPClient http;
+    http.begin(url);
+    
+    // Add API key header
+    http.addHeader("x-cg-demo-api-key", coingecko_api_key);
+    
+    int httpCode = http.GET();
+    
+    if (httpCode == 200) {
+        String payload = http.getString();
+        Serial.println("Crypto API Response: " + payload);
+        
+        // Parse JSON
+        JsonDocument doc;
+        DeserializationError error = deserializeJson(doc, payload);
+        
+        if (!error) {
+            // Get price from response - the key is the lowercase symbol
+            double price = doc[symbol_lower]["usd"] | 0.0;
+            double change_24h = doc[symbol_lower]["usd_24h_change"] | 0.0;
+            
+            // Format price with no decimals and add comma separation
+            long price_int = (long)price;
+            crypto_price = String(price_int);
+            
+            // Format change with 2 decimals
+            char change_buffer[20];
+            snprintf(change_buffer, sizeof(change_buffer), "%.2f", change_24h);
+            crypto_change = change_buffer;
+            
+            Serial.print("Crypto price: ");
+            Serial.println(crypto_price);
+            Serial.print("Crypto change: ");
+            Serial.println(crypto_change);
+            Serial.println("Crypto data parsed successfully");
+        } else {
+            Serial.println("JSON parsing error");
+            crypto_price = "Parse Error";
+            crypto_change = "N/A";
+        }
+    } else {
+        Serial.print("HTTP Error: ");
+        Serial.println(httpCode);
+        crypto_price = "API Error";
+        crypto_change = "N/A";
     }
     
     http.end();
@@ -387,6 +470,14 @@ void displayWeather() {
     int tmpr_x = left_x - w / 2;
     int tmpr_y = left_y + h;
     writeln((GFXfont *)&Lexend18, display_buffer, &tmpr_x, &tmpr_y, NULL);
+
+    // Crypto price left align
+    left_x = 20;
+    left_y += 120;
+    String upper_symbol = crypto_symbol;
+    upper_symbol.toUpperCase();
+    snprintf(display_buffer, sizeof(display_buffer), "%s: USD %s, Change: %s", upper_symbol.c_str(), crypto_price.c_str(), crypto_change.c_str());
+    writeln((GFXfont *)&Lexend14, display_buffer, &left_x, &left_y, NULL);
     
     // RIGHT COLUMN: Condition and details
     int right_x = 500;
@@ -540,7 +631,7 @@ bool loadConfig() {
     password = doc["wifi"]["password"].as<String>();
     
     // Extract weather config
-    api_key = doc["weather"]["api_key"].as<String>();
+    owm_api_key = doc["weather"]["api_key"].as<String>();
     city = doc["weather"]["city"].as<String>();
     country_code = doc["weather"]["country"].as<String>();
     units = doc["weather"]["units"].as<String>();
@@ -548,14 +639,21 @@ bool loadConfig() {
     // Extract NTP config
     ntp_server = doc["ntp"]["server"].as<String>();
     timezone = doc["ntp"]["timezone"].as<String>();
+
+    // Extract CoinGecko config
+    coingecko_api_key = doc["crypto"]["api_key"].as<String>();
+    crypto_symbol = doc["crypto"]["symbol"].as<String>();
+    
+    Serial.print("Loaded Crypto Symbol: ");
+    Serial.println(crypto_symbol);
     
     // Extract update interval (convert minutes to milliseconds)
     int update_minutes = doc["update_interval_minutes"] | 5;
     UPDATE_INTERVAL = update_minutes * 60 * 1000;
     
     // Validate loaded config
-    if (ssid.isEmpty() || password.isEmpty() || api_key.isEmpty() || city.isEmpty() || 
-        ntp_server.isEmpty() || timezone.isEmpty()) {
+    if (ssid.isEmpty() || password.isEmpty() || owm_api_key.isEmpty() || city.isEmpty() || 
+        ntp_server.isEmpty() || timezone.isEmpty() || coingecko_api_key.isEmpty() || crypto_symbol.isEmpty()) {
         Serial.println("ERROR: Incomplete configuration in config.json");
         return false;
     }
