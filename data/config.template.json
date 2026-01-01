@@ -17,5 +17,9 @@
     "api_key": "YOUR_COINGECKO_API_KEY",
     "symbol": "btc"
   },
+  "stock": {
+    "api_key": "YOUR_MARKETSTACK_API_KEY",
+    "symbol": "AAPL"
+  },
   "update_interval_minutes": 5
 }

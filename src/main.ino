@@ -59,6 +59,10 @@ String timezone = "";
 String coingecko_api_key = "";
 String crypto_symbol = "";
 
+// MarketStack API (loaded from config.json)
+String marketstack_api_key = "";
+String stock_symbol = "";
+
 // Australia Eastern Time Zone (Sydney, Melbourne) - DST aware
 // AEDT: UTC+11 (Oct to Apr), AEST: UTC+10 (Apr to Oct)
 TimeChangeRule aEDT = {"AEDT", First, Sun, Oct, 2, 660};    // UTC + 11 hours
@@ -91,6 +95,11 @@ String current_icon_code = "01d";  // Default to clear day icon
 // Crypto data
 String crypto_price = "--";
 String crypto_change = "--";
+
+// Stock data
+String stock_price = "--";
+String stock_currency = "--";
+String stock_change = "--";
 
 // Structure to hold icon data and dimensions
 struct IconData {
@@ -217,6 +226,9 @@ void setup() {
     // Fetch crypto data
     fetchCryptoData();
     
+    // Fetch stock data
+    fetchStockData();
+    
     // Display weather
     displayWeather();
     
@@ -238,6 +250,7 @@ void loop() {
         // Fetch and display
         fetchWeatherData();
         fetchCryptoData();
+        fetchStockData();
         displayWeather();
         
         // Power down
@@ -380,9 +393,13 @@ void fetchCryptoData() {
             long price_int = (long)price;
             crypto_price = String(price_int);
             
-            // Format change with 2 decimals
+            // Format change with 2 decimals, add + for positive values
             char change_buffer[20];
-            snprintf(change_buffer, sizeof(change_buffer), "%.2f", change_24h);
+            if (change_24h >= 0) {
+                snprintf(change_buffer, sizeof(change_buffer), "+%.2f", change_24h);
+            } else {
+                snprintf(change_buffer, sizeof(change_buffer), "%.2f", change_24h);
+            }
             crypto_change = change_buffer;
             
             Serial.print("Crypto price: ");
@@ -405,6 +422,85 @@ void fetchCryptoData() {
     http.end();
 }
 
+void fetchStockData() {
+    if (WiFi.status() != WL_CONNECTED) {
+        Serial.println("WiFi not connected, skipping stock update");
+        stock_price = "No WiFi";
+        stock_currency = "--";
+        stock_change = "N/A";
+        return;
+    }
+    
+    Serial.println("Fetching stock data...");
+    
+    // Build API URL
+    String url = String("http://api.marketstack.com/v2/eod/latest?access_key=") + 
+                 marketstack_api_key + 
+                 "&symbols=" + stock_symbol;
+    
+    Serial.println("Stock API: " + url);
+
+    HTTPClient http;
+    http.begin(url);
+    
+    int httpCode = http.GET();
+    
+    if (httpCode == 200) {
+        String payload = http.getString();
+        Serial.println("Stock API Response: " + payload);
+        
+        // Parse JSON
+        JsonDocument doc;
+        DeserializationError error = deserializeJson(doc, payload);
+        
+        if (!error) {
+            // Get stock data from first element in data array
+            double open_price = doc["data"][0]["open"] | 0.0;
+            double close_price = doc["data"][0]["close"] | 0.0;
+            const char* currency = doc["data"][0]["price_currency"] | "--";
+            
+            // Store currency
+            stock_currency = currency;
+            
+            // Format price with 2 decimals
+            char price_buffer[20];
+            snprintf(price_buffer, sizeof(price_buffer), "%.2f", close_price);
+            stock_price = price_buffer;
+            
+            // Calculate change: close - open, add + for positive values
+            double change = close_price - open_price;
+            char change_buffer[20];
+            if (change >= 0) {
+                snprintf(change_buffer, sizeof(change_buffer), "+%.2f", change);
+            } else {
+                snprintf(change_buffer, sizeof(change_buffer), "%.2f", change);
+            }
+            stock_change = change_buffer;
+            
+            Serial.print("Stock price: ");
+            Serial.println(stock_price);
+            Serial.print("Stock currency: ");
+            Serial.println(stock_currency);
+            Serial.print("Stock change: ");
+            Serial.println(stock_change);
+            Serial.println("Stock data parsed successfully");
+        } else {
+            Serial.println("JSON parsing error");
+            stock_price = "Parse Error";
+            stock_currency = "--";
+            stock_change = "N/A";
+        }
+    } else {
+        Serial.print("HTTP Error: ");
+        Serial.println(httpCode);
+        stock_price = "API Error";
+        stock_currency = "--";
+        stock_change = "N/A";
+    }
+    
+    http.end();
+}
+
 void displayWeather() {
     Serial.println("Displaying weather...");
     
@@ -420,12 +516,6 @@ void displayWeather() {
     int x1, y1, w, h;
     int xx = left_x, yy = left_y;
     
-    // // Display date at top of left column
-    // get_text_bounds((GFXfont *)&Lexend28, (current_day + " " + current_date).c_str(), &xx, &yy, &x1, &y1, &w, &h, NULL);
-    // int date_x = left_x - w / 2;
-    // int date_y = left_y + h;
-    // writeln((GFXfont *)&Lexend28, (current_day + " " + current_date).c_str(), &date_x, &date_y, NULL);
-
     // City (large font)
     // left_x = 240;
     // left_y += 40;
@@ -471,20 +561,9 @@ void displayWeather() {
     int tmpr_y = left_y + h;
     writeln((GFXfont *)&Lexend18, display_buffer, &tmpr_x, &tmpr_y, NULL);
 
-    // Crypto price left align
-    left_x = 20;
-    left_y += 120;
-    String upper_symbol = crypto_symbol;
-    upper_symbol.toUpperCase();
-    snprintf(display_buffer, sizeof(display_buffer), "%s: USD %s, Change: %s", upper_symbol.c_str(), crypto_price.c_str(), crypto_change.c_str());
-    writeln((GFXfont *)&Lexend14, display_buffer, &left_x, &left_y, NULL);
-    
     // RIGHT COLUMN: Condition and details
     int right_x = 500;
     int right_y = 80;
-
-    // // City
-    // writeln((GFXfont *)&Lexend28, city.c_str(), &right_x, &right_y, NULL);
 
     // Day date
     writeln((GFXfont *)&Lexend28, (current_day + " " + current_date).c_str(), &right_x, &right_y, NULL);
@@ -512,6 +591,22 @@ void displayWeather() {
     snprintf(display_buffer, sizeof(display_buffer), "Wind: %s", wind_speed.c_str());
     writeln((GFXfont *)&Lexend18, display_buffer, &right_x, &right_y, NULL);
 
+    // Stock market
+    right_x = 500;
+    right_y += 80;
+    String upper_stock = stock_symbol;
+    upper_stock.toUpperCase();
+    snprintf(display_buffer, sizeof(display_buffer), "%s: %s %s, %s", upper_stock.c_str(), stock_currency.c_str(), stock_price.c_str(), stock_change.c_str());
+    writeln((GFXfont *)&Lexend14, display_buffer, &right_x, &right_y, NULL);
+
+    // Crypto market
+    right_x = 500;
+    right_y += 40;
+    String upper_symbol = crypto_symbol;
+    upper_symbol.toUpperCase();
+    snprintf(display_buffer, sizeof(display_buffer), "%s: USD %s, %s", upper_symbol.c_str(), crypto_price.c_str(), crypto_change.c_str());
+    writeln((GFXfont *)&Lexend14, display_buffer, &right_x, &right_y, NULL);
+    
     // BOTTOM: Last updated timestamp
     time_t utc = time(nullptr);
     TimeChangeRule *tcr;
@@ -644,8 +739,9 @@ bool loadConfig() {
     coingecko_api_key = doc["crypto"]["api_key"].as<String>();
     crypto_symbol = doc["crypto"]["symbol"].as<String>();
     
-    Serial.print("Loaded Crypto Symbol: ");
-    Serial.println(crypto_symbol);
+    // Extract MarketStack config
+    marketstack_api_key = doc["stock"]["api_key"].as<String>();
+    stock_symbol = doc["stock"]["symbol"].as<String>();
     
     // Extract update interval (convert minutes to milliseconds)
     int update_minutes = doc["update_interval_minutes"] | 5;
