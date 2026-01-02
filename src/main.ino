@@ -496,12 +496,6 @@ void fetchTrainData() {
         DeserializationError error = deserializeJson(doc, response, DeserializationOption::NestingLimit(20));
 
         if (!error) {
-            // Extract destination name and departure time
-            // destination.name format: "Central Station, Platform 8, Sydney"
-            // We want just "Central Station"
-            const char* dest_full = doc["journeys"][0]["legs"][0]["destination"]["name"] | "Unknown";
-            String dest_str = String(dest_full);
-            
             // Extract train via destination
             const char* via_dest = doc["journeys"][0]["legs"][0]["transportation"]["destination"]["name"] | "--";
             train_via = via_dest;
@@ -552,7 +546,6 @@ void fetchTrainData() {
                 train_departure_time = time_buffer;
             }
             
-            Serial.print("Train destination: ");
             Serial.print("Train departure time: ");
             Serial.println(train_departure_time);
             Serial.println("Train data parsed successfully");
