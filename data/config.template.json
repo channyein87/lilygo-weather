@@ -21,5 +21,10 @@
     "api_key": "YOUR_MARKETSTACK_API_KEY",
     "symbol": "AAPL"
   },
+  "train": {
+    "api_key": "YOUR_TRANSPORTNSW_API_KEY",
+    "origin": "ORIGIN_STATION_ID",
+    "destination": "DESTINATION_STATION_ID"
+  },
   "update_interval_minutes": 5
 }

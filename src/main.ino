@@ -10,6 +10,7 @@
 #include <ArduinoJson.h>
 #include <LittleFS.h>
 #include <Timezone.h>
+#include <StreamUtils.h>
 
 // Weather icons
 #include <owm_01d.h>
@@ -63,6 +64,11 @@ String crypto_symbol = "";
 String marketstack_api_key = "";
 String stock_symbol = "";
 
+// TransportNSW API (loaded from config.json)
+String transportnsw_api_key = "";
+String origin_station_id = "";
+String destination_station_id = "";
+
 // Australia Eastern Time Zone (Sydney, Melbourne) - DST aware
 // AEDT: UTC+11 (Oct to Apr), AEST: UTC+10 (Apr to Oct)
 TimeChangeRule aEDT = {"AEDT", First, Sun, Oct, 2, 660};    // UTC + 11 hours
@@ -81,6 +87,7 @@ uint8_t *framebuffer = NULL;
 
 // ===== GLOBALS =====
 unsigned long last_update = 0;
+int loop_count = 0;  // Counter for loop iterations
 String current_temp = "--";
 String current_condition = "Loading...";
 String current_humidity = "--";
@@ -100,6 +107,11 @@ String crypto_change = "--";
 String stock_price = "--";
 String stock_currency = "--";
 String stock_change = "--";
+
+// Train data
+String train_destination = "--";
+String train_departure_time = "--:--";
+String train_via = "--";
 
 // Structure to hold icon data and dimensions
 struct IconData {
@@ -229,6 +241,9 @@ void setup() {
     // Fetch stock data
     fetchStockData();
     
+    // Fetch train data
+    fetchTrainData();
+    
     // Display weather
     displayWeather();
     
@@ -249,8 +264,17 @@ void loop() {
         
         // Fetch and display
         fetchWeatherData();
-        fetchCryptoData();
-        fetchStockData();
+        
+        // Fetch train data
+        fetchTrainData();
+        
+        // Only update crypto/stock data every 12 loops
+        loop_count++;
+        if (loop_count % 12 == 0) {
+            fetchCryptoData();
+            fetchStockData();
+        }
+        
         displayWeather();
         
         // Power down
@@ -422,6 +446,152 @@ void fetchCryptoData() {
     http.end();
 }
 
+void fetchTrainData() {
+    if (WiFi.status() != WL_CONNECTED) {
+        Serial.println("WiFi not connected, skipping train update");
+        train_destination = "No WiFi";
+        train_departure_time = "--:--";
+        return;
+    }
+    
+    Serial.println("Fetching train data...");
+    
+    // Build API URL with required parameters
+    String url = String("https://api.transport.nsw.gov.au/v1/tp/trip?") +
+                 "outputFormat=rapidJSON&" +
+                 "coordOutputFormat=EPSG%3A4326&" +
+                 "depArrMacro=dep&" +
+                 "type_origin=any&" +
+                 "name_origin=" + origin_station_id + "&" +
+                 "type_destination=any&" +
+                 "name_destination=" + destination_station_id + "&" +
+                 "calcNumberOfTrips=1&" +
+                 "excludedMeans=checkbox&" +
+                 "exclMOT_5=1&" +
+                 "TfNSWTR=true&" +
+                 "version=10.2.1.42&" +
+                 "itOptionsActive=1&" +
+                 "cycleSpeed=16";
+    
+    Serial.println("Train API: " + url);
+    
+    HTTPClient http;
+    const char* keys[] = {"Transfer-Encoding"};
+    http.collectHeaders(keys, 1);
+    http.begin(url);
+    
+    // Add authorization header with apikey prefix
+    http.addHeader("Authorization", "apikey " + transportnsw_api_key);
+    http.addHeader("accept", "application/json");
+    
+    int httpCode = http.GET();
+    
+    if (httpCode == 200) {
+        // Get the raw stream
+        Stream& rawStream = http.getStream();
+        ChunkDecodingStream decodedStream(http.getStream());
+        Stream& response = http.header("Transfer-Encoding") == "chunked" ? decodedStream : rawStream;
+        
+        // Parse JSON
+        JsonDocument doc;
+        DeserializationError error = deserializeJson(doc, response, DeserializationOption::NestingLimit(20));
+
+        if (!error) {
+            // Extract destination name and departure time
+            // destination.name format: "Central Station, Platform 8, Sydney"
+            // We want just "Central Station"
+            const char* dest_full = doc["journeys"][0]["legs"][0]["destination"]["name"] | "Unknown";
+            String dest_str = String(dest_full);
+            
+            // Split by comma and take first part
+            int comma_pos = dest_str.indexOf(',');
+            if (comma_pos > 0) {
+                train_destination = dest_str.substring(0, comma_pos);
+            } else {
+                train_destination = dest_str;
+            }
+            
+            // Remove " Station" suffix if it exists
+            if (train_destination.endsWith(" Station")) {
+                train_destination = train_destination.substring(0, train_destination.length() - 8);
+            }
+            
+            // Extract train via destination
+            const char* via_dest = doc["journeys"][0]["legs"][0]["transportation"]["destination"]["name"] | "--";
+            train_via = via_dest;
+            
+            // Extract departure time in UTC
+            const char* dep_time_utc = doc["journeys"][0]["legs"][0]["origin"]["departureTimeEstimated"] | "";
+            Serial.print("Departure time UTC: ");
+            Serial.println(dep_time_utc);
+            
+            // Parse ISO 8601 datetime string and convert to ausET time
+            // Format: "2026-01-01T11:05:30Z"
+            if (String(dep_time_utc).length() > 0) {
+                // Parse the ISO string manually
+                int year = atoi(String(dep_time_utc).substring(0, 4).c_str());
+                int month = atoi(String(dep_time_utc).substring(5, 7).c_str());
+                int day = atoi(String(dep_time_utc).substring(8, 10).c_str());
+                int hour = atoi(String(dep_time_utc).substring(11, 13).c_str());
+                int minute = atoi(String(dep_time_utc).substring(14, 16).c_str());
+                int second = atoi(String(dep_time_utc).substring(17, 19).c_str());
+                
+                // Create time_t from parsed values (assuming UTC)
+                struct tm timeinfo = {};
+                timeinfo.tm_year = year - 1900;
+                timeinfo.tm_mon = month - 1;
+                timeinfo.tm_mday = day;
+                timeinfo.tm_hour = hour;
+                timeinfo.tm_min = minute;
+                timeinfo.tm_sec = second;
+                timeinfo.tm_isdst = 0;  // UTC has no DST
+                
+                time_t utc_time = mktime(&timeinfo);
+                // Adjust for UTC (mktime assumes local time)
+                utc_time -= timezone.toInt() * 3600;  // This is a workaround, better to use proper UTC handling
+                
+                // Convert to ausET timezone
+                TimeChangeRule *tcr;
+                time_t local_time = ausET.toLocal(utc_time, &tcr);
+                
+                struct tm *local_timeinfo = localtime(&local_time);
+                
+                // Format as HH:MMAM/PM
+                char time_buffer[20];
+                int hour_12 = local_timeinfo->tm_hour % 12;
+                if (hour_12 == 0) hour_12 = 12;
+                const char *am_pm = local_timeinfo->tm_hour >= 12 ? "PM" : "AM";
+                snprintf(time_buffer, sizeof(time_buffer), "%02d:%02d%s", hour_12, local_timeinfo->tm_min, am_pm);
+                
+                train_departure_time = time_buffer;
+            }
+            
+            Serial.print("Train destination: ");
+            Serial.println(train_destination);
+            Serial.print("Train departure time: ");
+            Serial.println(train_departure_time);
+            Serial.println("Train data parsed successfully");
+        } else {
+            Serial.println("JSON parsing error");
+            Serial.print("Error code: ");
+            Serial.println(error.c_str());
+            train_destination = "Parse Error";
+            train_departure_time = "--:--";
+        }
+
+        // // Pause for debugging
+        // delay(3600000);
+        
+    } else {
+        Serial.print("HTTP Error: ");
+        Serial.println(httpCode);
+        train_destination = "API Error";
+        train_departure_time = "--:--";
+    }
+    
+    http.end();
+}
+
 void fetchStockData() {
     if (WiFi.status() != WL_CONNECTED) {
         Serial.println("WiFi not connected, skipping stock update");
@@ -560,6 +730,17 @@ void displayWeather() {
     int tmpr_x = left_x - w / 2;
     int tmpr_y = left_y + h;
     writeln((GFXfont *)&Lexend18, display_buffer, &tmpr_x, &tmpr_y, NULL);
+
+    // Train schedule
+    left_x = 20;
+    left_y += 100;
+    snprintf(display_buffer, sizeof(display_buffer), "Train to %s %s", train_destination.c_str(), train_departure_time.c_str());
+    writeln((GFXfont *)&Lexend14, display_buffer, &left_x, &left_y, NULL);
+
+    // Train info
+    left_x = 20;
+    left_y += 40;
+    writeln((GFXfont *)&Lexend14, train_via.c_str(), &left_x, &left_y, NULL);
 
     // RIGHT COLUMN: Condition and details
     int right_x = 500;
@@ -743,13 +924,19 @@ bool loadConfig() {
     marketstack_api_key = doc["stock"]["api_key"].as<String>();
     stock_symbol = doc["stock"]["symbol"].as<String>();
     
+    // Extract Transport NSW train trip config
+    transportnsw_api_key = doc["train"]["api_key"].as<String>();
+    origin_station_id = doc["train"]["origin"].as<String>();
+    destination_station_id = doc["train"]["destination"].as<String>();
+    
     // Extract update interval (convert minutes to milliseconds)
     int update_minutes = doc["update_interval_minutes"] | 5;
     UPDATE_INTERVAL = update_minutes * 60 * 1000;
     
     // Validate loaded config
     if (ssid.isEmpty() || password.isEmpty() || owm_api_key.isEmpty() || city.isEmpty() || 
-        ntp_server.isEmpty() || timezone.isEmpty() || coingecko_api_key.isEmpty() || crypto_symbol.isEmpty()) {
+        ntp_server.isEmpty() || timezone.isEmpty() || coingecko_api_key.isEmpty() || crypto_symbol.isEmpty() ||
+        transportnsw_api_key.isEmpty() || origin_station_id.isEmpty() || destination_station_id.isEmpty()) {
         Serial.println("ERROR: Incomplete configuration in config.json");
         return false;
     }
