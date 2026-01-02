@@ -1,4 +1,5 @@
 #include <epd_driver.h>
+#include <esp_adc_cal.h>
 #include <lexend10.h>
 #include <lexend14.h>
 #include <lexend18.h>
@@ -109,7 +110,6 @@ String stock_currency = "--";
 String stock_change = "--";
 
 // Train data
-String train_destination = "--";
 String train_departure_time = "--:--";
 String train_via = "--";
 
@@ -449,7 +449,6 @@ void fetchCryptoData() {
 void fetchTrainData() {
     if (WiFi.status() != WL_CONNECTED) {
         Serial.println("WiFi not connected, skipping train update");
-        train_destination = "No WiFi";
         train_departure_time = "--:--";
         return;
     }
@@ -503,19 +502,6 @@ void fetchTrainData() {
             const char* dest_full = doc["journeys"][0]["legs"][0]["destination"]["name"] | "Unknown";
             String dest_str = String(dest_full);
             
-            // Split by comma and take first part
-            int comma_pos = dest_str.indexOf(',');
-            if (comma_pos > 0) {
-                train_destination = dest_str.substring(0, comma_pos);
-            } else {
-                train_destination = dest_str;
-            }
-            
-            // Remove " Station" suffix if it exists
-            if (train_destination.endsWith(" Station")) {
-                train_destination = train_destination.substring(0, train_destination.length() - 8);
-            }
-            
             // Extract train via destination
             const char* via_dest = doc["journeys"][0]["legs"][0]["transportation"]["destination"]["name"] | "--";
             train_via = via_dest;
@@ -567,7 +553,6 @@ void fetchTrainData() {
             }
             
             Serial.print("Train destination: ");
-            Serial.println(train_destination);
             Serial.print("Train departure time: ");
             Serial.println(train_departure_time);
             Serial.println("Train data parsed successfully");
@@ -575,7 +560,6 @@ void fetchTrainData() {
             Serial.println("JSON parsing error");
             Serial.print("Error code: ");
             Serial.println(error.c_str());
-            train_destination = "Parse Error";
             train_departure_time = "--:--";
         }
 
@@ -585,7 +569,6 @@ void fetchTrainData() {
     } else {
         Serial.print("HTTP Error: ");
         Serial.println(httpCode);
-        train_destination = "API Error";
         train_departure_time = "--:--";
     }
     
@@ -671,6 +654,58 @@ void fetchStockData() {
     http.end();
 }
 
+void drawBattery(int x, int y) {
+    uint8_t percentage = 100;
+    float voltage = 0;
+    int vref = 1100;
+    
+    // Initialize ADC calibration
+    esp_adc_cal_characteristics_t adc_chars;
+    esp_adc_cal_value_t val_type = esp_adc_cal_characterize(
+        ADC_UNIT_1, 
+        ADC_ATTEN_DB_11, 
+        ADC_WIDTH_BIT_12, 
+        1100, 
+        &adc_chars
+    );
+    
+    if (val_type == ESP_ADC_CAL_VAL_EFUSE_VREF) {
+        vref = adc_chars.vref;
+        Serial.printf("eFuse Vref: %u mV\n", adc_chars.vref);
+    }
+    
+    // Read battery ADC pin (GPIO 14 for ESP32-S3)
+    const uint8_t bat_adc_pin = 14;
+    voltage = analogRead(bat_adc_pin) / 4096.0 * 6.566 * (vref / 1000.0);
+    
+    if (voltage > 1) {  // Only display if valid reading
+        Serial.printf("Battery Voltage: %.2f V\n", voltage);
+        
+        // Polynomial formula to convert voltage to percentage
+        // (calibrated for Li-Po battery 3.2V min - 4.2V max)
+        percentage = 2836.9625 * pow(voltage, 4) 
+                   - 43987.4889 * pow(voltage, 3) 
+                   + 255233.8134 * pow(voltage, 2) 
+                   - 656689.7123 * voltage 
+                   + 632041.7303;
+        
+        // Clamp values
+        if (voltage >= 4.20) percentage = 100;
+        if (voltage <= 3.20) percentage = 0;
+        
+        // Format battery text: "100% 4.2v"
+        char battery_text[20];
+        snprintf(battery_text, sizeof(battery_text), "Battery: %d%% %.1fv", percentage, voltage);
+        
+        // Display battery info
+        int bat_x = x;
+        int bat_y = y;
+        writeln((GFXfont *)&Lexend10, battery_text, &bat_x, &bat_y, NULL);
+        
+        Serial.println(battery_text);
+    }
+}
+
 void displayWeather() {
     Serial.println("Displaying weather...");
     
@@ -682,7 +717,7 @@ void displayWeather() {
     
     // LEFT COLUMN: City and Temperature
     int left_x = 240;
-    int left_y = 20;
+    int left_y = 40;
     int x1, y1, w, h;
     int xx = left_x, yy = left_y;
     
@@ -697,7 +732,7 @@ void displayWeather() {
     
     // Draw icon based on weather condition
     left_x = 190;
-    left_y += 100;
+    left_y += 80;
     
     // Get the appropriate icon data based on API response
     IconData icon = getIconData(current_icon_code);
@@ -734,7 +769,7 @@ void displayWeather() {
     // Train schedule
     left_x = 20;
     left_y += 100;
-    snprintf(display_buffer, sizeof(display_buffer), "Train to %s %s", train_destination.c_str(), train_departure_time.c_str());
+    snprintf(display_buffer, sizeof(display_buffer), "Train to city : %s", train_departure_time.c_str());
     writeln((GFXfont *)&Lexend14, display_buffer, &left_x, &left_y, NULL);
 
     // Train info
@@ -800,6 +835,11 @@ void displayWeather() {
     left_x = 20;
     left_y = EPD_DISPLAY_HEIGHT - 20;
     writeln((GFXfont *)&Lexend10, time_buffer, &left_x, &left_y, NULL);
+
+    // Battery info
+    right_x = 500;
+    right_y = EPD_DISPLAY_HEIGHT - 20;
+    drawBattery(right_x, right_y);
 }
 
 void syncTime() {
