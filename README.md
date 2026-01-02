@@ -1,17 +1,26 @@
-# LILYGO T5 Weather Display
+# LILYGO T5 Information Display
 
-A complete weather display application for the **LILYGO T5 4.7" e-paper display** using **OpenWeatherMap API**. Pure C++ firmware with automatic 30-minute updates, low-power operation, and LittleFS configuration storage.
+A complete information display application for the **LILYGO T5 4.7" e-paper display** featuring weather, cryptocurrency prices, stock market data, and train schedules. Pure C++ firmware with automatic updates, low-power operation, and LittleFS configuration storage.
 
 ## Quick Start
 
-### 1. Get API Key (2 minutes)
-- Visit: https://openweathermap.org/api
-- Create free account
-- Copy your API key (64 characters)
+### 1. Get API Keys (5 minutes)
 
-### 2. Configure Device (3 minutes)
+**Required:**
+- **OpenWeatherMap** (weather data): https://openweathermap.org/api - Free tier: 1000 calls/day
 
-Edit `data/config.json` with your settings:
+**Optional (for additional features):**
+- **CoinGecko** (cryptocurrency prices): https://www.coingecko.com/en/api - Free tier: 30 calls/minute
+- **MarketStack** (stock market data): https://marketstack.com/ - Free tier: 100 calls/month
+- **Transport NSW** (Sydney train schedules): https://opendata.transport.nsw.gov.au/ - Free with registration
+
+### 2. Configure Device (5 minutes)
+
+Copy the template and edit `data/config.json` with your settings:
+
+```bash
+cp data/config.template.json data/config.json
+```
 
 ```json
 {
@@ -20,14 +29,33 @@ Edit `data/config.json` with your settings:
     "password": "YOUR_WIFI_PASSWORD"
   },
   "weather": {
-    "api_key": "YOUR_API_KEY",
-    "city": "London",
-    "country": "GB",
+    "api_key": "YOUR_OPENWEATHERMAP_API_KEY",
+    "city": "Sydney",
+    "country": "AU",
     "units": "metric"
   },
-  "update_interval_minutes": 30
+  "ntp": {
+    "server": "au.pool.ntp.org",
+    "timezone": "Australia/Sydney"
+  },
+  "crypto": {
+    "api_key": "YOUR_COINGECKO_API_KEY",
+    "symbol": "btc"
+  },
+  "stock": {
+    "api_key": "YOUR_MARKETSTACK_API_KEY",
+    "symbol": "AAPL"
+  },
+  "train": {
+    "api_key": "YOUR_TRANSPORTNSW_API_KEY",
+    "origin": "10101100",
+    "destination": "10101331"
+  },
+  "update_interval_minutes": 5
 }
 ```
+
+**Note:** All API keys except OpenWeatherMap are optional. If you don't provide keys for crypto, stock, or train APIs, those sections will show placeholder values.
 
 ### 3. Build & Upload (3 minutes)
 ```bash
@@ -41,33 +69,40 @@ pio run -t upload
 pio device monitor -b 115200
 ```
 
-**Done!** Weather displays on your device and updates every 30 minutes automatically.
+**Done!** Your information dashboard displays on the device and updates automatically at the configured interval.
 
 ---
 
 ## Features
 
-✅ **Real-time Weather** - Fetches current temperature, condition, humidity, wind speed  
-✅ **Automatic Updates** - Every 30 minutes (configurable)  
+✅ **Real-time Weather** - Temperature, conditions, humidity, wind speed (OpenWeatherMap)  
+✅ **Cryptocurrency Prices** - Live crypto prices with 24h change (CoinGecko)  
+✅ **Stock Market Data** - Real-time stock prices and daily changes (MarketStack)  
+✅ **Train Schedules** - Next departure times for Sydney trains (Transport NSW)  
+✅ **Automatic Time Sync** - NTP-based time synchronization with timezone support  
+✅ **Automatic Updates** - Configurable update interval (1-60 minutes)  
 ✅ **Low Power** - 5-10 day battery life with typical usage  
 ✅ **WiFi Ready** - Auto-reconnection with error handling  
-✅ **Configuration Storage** - Credentials stored in LittleFS, no firmware edits needed  
-✅ **Well-Documented** - Setup takes 10 minutes  
+✅ **Configuration Storage** - All credentials stored in LittleFS, no firmware edits needed  
+✅ **Well-Documented** - Complete setup in 15 minutes  
 
 ---
 
 ## What Gets Displayed
 
 ```
-London
+LEFT COLUMN:                    RIGHT COLUMN:
+Sydney                         Wednesday 27 Dec 2023
 25.3°C
+                               Partly Cloudy
+Max: 28°C | Min: 22°C         Feels like: 24.1°C
+                               Humidity: 65%
+Train to city: 14:35          Wind: 3.2 m/s NW
+via Central
+                               AAPL: USD 195.50, +2.30%
+                               BTC: USD 45230, -1.20%
 
-Partly Cloudy
-Feels like: 24.1°C
-Humidity: 65%
-Wind: 3.2 m/s
-
-Updated: 2025-12-27 14:30
+Update: 27 Dec 2023 @ 14:30
 ```
 
 ---
@@ -109,15 +144,49 @@ Updated: 2025-12-27 14:30
 
 ## Configuration Reference
 
+### WiFi Settings
 | Setting | Key | Example | Notes |
 |---------|-----|---------|-------|
 | WiFi SSID | `wifi.ssid` | "MyNetwork" | Case-sensitive, 2.4GHz only |
 | WiFi Password | `wifi.password` | "password123" | Case-sensitive |
+
+### Weather Settings (OpenWeatherMap) - Required
+| Setting | Key | Example | Notes |
+|---------|-----|---------|-------|
 | API Key | `weather.api_key` | "abc123...xyz" | Get from openweathermap.org (64 chars) |
-| City | `weather.city` | "London" | English name only |
-| Country Code | `weather.country` | "GB" | ISO 3166 (2 letters) |
+| City | `weather.city` | "Sydney" | English name only |
+| Country Code | `weather.country` | "AU" | ISO 3166 (2 letters) |
 | Units | `weather.units` | "metric" | "metric" (°C) or "imperial" (°F) |
-| Update Interval | `update_interval_minutes` | 30 | Minutes between API calls (1-60) |
+
+### Time Settings (NTP) - Required
+| Setting | Key | Example | Notes |
+|---------|-----|---------|-------|
+| NTP Server | `ntp.server` | "au.pool.ntp.org" | Use regional pool for accuracy |
+| Timezone | `ntp.timezone` | "Australia/Sydney" | IANA timezone identifier |
+
+### Cryptocurrency Settings (CoinGecko) - Optional
+| Setting | Key | Example | Notes |
+|---------|-----|---------|-------|
+| API Key | `crypto.api_key` | "CG-abc123...xyz" | Get from coingecko.com (free tier available) |
+| Symbol | `crypto.symbol` | "btc" | Lowercase crypto symbol (btc, eth, etc.) |
+
+### Stock Market Settings (MarketStack) - Optional
+| Setting | Key | Example | Notes |
+|---------|-----|---------|-------|
+| API Key | `stock.api_key` | "abc123...xyz" | Get from marketstack.com (free: 100/month) |
+| Symbol | `stock.symbol` | "AAPL" | Stock ticker symbol (AAPL, MSFT, etc.) |
+
+### Train Schedule Settings (Transport NSW) - Optional
+| Setting | Key | Example | Notes |
+|---------|-----|---------|-------|
+| API Key | `train.api_key` | "abc123...xyz" | Get from opendata.transport.nsw.gov.au |
+| Origin | `train.origin` | "10101100" | Station ID (see Transport NSW docs) |
+| Destination | `train.destination` | "10101331" | Station ID (see Transport NSW docs) |
+
+### Update Settings
+| Setting | Key | Example | Notes |
+|---------|-----|---------|-------|
+| Update Interval | `update_interval_minutes` | 5 | Minutes between API calls (1-60) |
 
 ---
 
@@ -173,10 +242,32 @@ LilyGo_API_Reference.md     # Display library API documentation
 
 ## API Information
 
-- **Service**: OpenWeatherMap
+### OpenWeatherMap (Weather Data) - Required
+- **Website**: https://openweathermap.org/api
 - **Free Tier**: 1000 calls/day, 60 calls/minute
-- **Update Rate**: Minimum ~10 minutes recommended for free tier
+- **Documentation**: https://openweathermap.org/current
 - **Endpoint**: `https://api.openweathermap.org/data/2.5/weather`
+
+### CoinGecko (Cryptocurrency Prices) - Optional
+- **Website**: https://www.coingecko.com/en/api
+- **Free Tier**: 30 calls/minute, 10,000 calls/month
+- **Documentation**: https://docs.coingecko.com/reference/simple-price
+- **Endpoint**: `https://api.coingecko.com/api/v3/simple/price`
+- **Note**: Free tier requires API key (prefix: CG-)
+
+### MarketStack (Stock Market Data) - Optional
+- **Website**: https://marketstack.com/
+- **Free Tier**: 100 calls/month (limited but sufficient for daily checks)
+- **Documentation**: https://marketstack.com/documentation
+- **Endpoint**: `http://api.marketstack.com/v2/eod/latest`
+- **Note**: Free tier uses HTTP (not HTTPS)
+
+### Transport NSW (Train Schedules) - Optional
+- **Website**: https://opendata.transport.nsw.gov.au/
+- **Free Tier**: Free with registration
+- **Documentation**: https://opendata.transport.nsw.gov.au/documentation
+- **Endpoint**: `https://api.transport.nsw.gov.au/v1/tp/trip`
+- **Note**: Sydney area trains only, requires station IDs
 
 ---
 
@@ -187,7 +278,7 @@ Edit `data/config.json`:
 ```json
 "update_interval_minutes": 10
 ```
-Then run `pio run -t uploadfs` and `pio run -t upload` to apply.
+Then run `pio run -t uploadfs` to apply (no firmware recompile needed).
 
 ### Use Fahrenheit
 Edit `data/config.json`:
@@ -206,8 +297,46 @@ Edit `data/config.json`:
 }
 ```
 
+### Change Timezone
+Edit `data/config.json`:
+```json
+"ntp": {
+  "server": "europe.pool.ntp.org",
+  "timezone": "Europe/Paris"
+}
+```
+See [IANA Timezone Database](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones) for valid timezone names.
+
+### Different Cryptocurrency
+Edit `data/config.json`:
+```json
+"crypto": {
+  "symbol": "eth"
+}
+```
+Use lowercase symbols: btc, eth, ada, sol, etc. See [CoinGecko API](https://www.coingecko.com/en/api) for available symbols.
+
+### Different Stock
+Edit `data/config.json`:
+```json
+"stock": {
+  "symbol": "MSFT"
+}
+```
+Use uppercase ticker symbols. US stocks only for free tier.
+
+### Different Train Route
+Edit `data/config.json`:
+```json
+"train": {
+  "origin": "10101100",
+  "destination": "10101331"
+}
+```
+Find station IDs in [Transport NSW documentation](https://opendata.transport.nsw.gov.au/documentation).
+
 ### Customize Display Layout
-Edit the `displayWeather()` function in [src/main.ino](src/main.ino) (around line 300) to change font sizes, positions, or data displayed.
+Edit the `displayWeather()` function in [src/main.ino](src/main.ino) (around line 700) to change font sizes, positions, or data displayed.
 
 ---
 
@@ -239,51 +368,75 @@ pio run -t clean
 
 **Startup (should see):**
 ```
-=== LILYGO T5 Weather Display ===
+=== LILYGO T5 Information Display ===
 Starting up...
 Connecting to WiFi: MyNetwork
 .....
 WiFi connected!
 IP address: 192.168.1.100
+Config loaded successfully
 Fetching weather data...
-API Response: {...}
 Weather data parsed successfully
-Displaying weather...
-Setup complete. Weather displayed.
+Fetching crypto data...
+Crypto data parsed successfully
+Fetching stock data...
+Stock data parsed successfully
+Fetching train data...
+Train data parsed successfully
+Displaying information...
+Setup complete. Display updated.
 ```
 
-**Auto-Update (every 30 minutes):**
+**Auto-Update (every configured interval):**
 ```
-Time to refresh weather data...
+Time to refresh data...
 Fetching weather data...
-Weather data parsed successfully
-Displaying weather...
+Fetching crypto data...
+Fetching stock data...
+Fetching train data...
+Display updated.
 ```
 
 ---
 
 ## Success Checklist
 
-- [ ] Have WiFi SSID ready
-- [ ] Have WiFi password ready
-- [ ] Got API key from openweathermap.org
-- [ ] Know your city name (English)
-- [ ] Know your country code (2-letter)
+### Basic Setup
+- [ ] Have WiFi SSID and password ready
+- [ ] Got OpenWeatherMap API key
+- [ ] Know your city name (English) and country code
 - [ ] Created `data/config.json` from template
+- [ ] Configured NTP server and timezone
 - [ ] Ran `pio run -t uploadfs`
 - [ ] Ran `pio run -t upload`
 - [ ] Serial shows "WiFi connected!"
 - [ ] Serial shows "Config loaded successfully"
-- [ ] Serial shows "Weather data parsed successfully"
 - [ ] Weather displays on device
-- [ ] Device updates after configured interval
+
+### Optional Features
+- [ ] Got CoinGecko API key for crypto prices
+- [ ] Got MarketStack API key for stock data
+- [ ] Got Transport NSW API key for train schedules
+- [ ] Configured desired crypto symbol
+- [ ] Configured desired stock symbol
+- [ ] Configured train origin and destination
+- [ ] Verified all data displays correctly
+- [ ] Device updates at configured interval
 
 ---
 
 ## Links
 
-- **OpenWeatherMap API**: https://openweathermap.org/api
+### API Documentation
+- **OpenWeatherMap**: https://openweathermap.org/api
+- **CoinGecko**: https://www.coingecko.com/en/api
+- **MarketStack**: https://marketstack.com/documentation
+- **Transport NSW**: https://opendata.transport.nsw.gov.au/documentation
+
+### Reference
 - **Country Codes**: https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2
+- **Timezone Database**: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+- **NTP Pool Servers**: https://www.ntppool.org/
 - **ESP32 Docs**: https://docs.espressif.com/projects/esp-idf/en/latest/esp32s3/
 - **PlatformIO Docs**: https://docs.platformio.org
 
@@ -298,4 +451,6 @@ Displaying weather...
 
 ---
 
-**Ready to start?** Copy `data/config.template.json` to `data/config.json`, edit your settings, then run `pio run -t uploadfs && pio run -t upload`!
+**Ready to start?** Copy `data/config.template.json` to `data/config.json`, edit your settings (at minimum: WiFi, weather API, and NTP), then run `pio run -t uploadfs && pio run -t upload`!
+
+**Note:** Only the OpenWeatherMap API key is required. CoinGecko, MarketStack, and Transport NSW APIs are optional features.
