@@ -1,21 +1,9 @@
 {
-  "wifi": {
-    "ssid": "YOUR_WIFI_SSID",
-    "password": "YOUR_WIFI_PASSWORD"
-  },
-  "middleware": {
-    "enabled": false,
-    "url": "http://192.168.1.100:5000/api/data"
-  },
   "weather": {
     "api_key": "YOUR_OPENWEATHERMAP_API_KEY",
     "city": "Sydney",
     "country": "AU",
     "units": "metric"
-  },
-  "ntp": {
-    "server": "au.pool.ntp.org",
-    "timezone": "Australia/Sydney"
   },
   "crypto": {
     "api_key": "YOUR_COINGECKO_API_KEY",
@@ -29,6 +17,5 @@
     "api_key": "YOUR_TRANSPORTNSW_API_KEY",
     "origin": "ORIGIN_STATION_ID",
     "destination": "DESTINATION_STATION_ID"
-  },
-  "update_interval_minutes": 5
+  }
 }
