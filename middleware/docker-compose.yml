@@ -1,0 +1,41 @@
+# SECURITY NOTICE:
+# This middleware is designed for LOCAL NETWORK use only.
+# Best practices for deployment:
+# 1. Use firewall rules to restrict access to local network (192.168.x.x, 10.x.x.x)
+# 2. Do NOT expose port 5000 to the internet without authentication
+# 3. Consider running behind nginx reverse proxy with rate limiting
+# 4. Keep Docker images updated regularly for security patches
+
+services:
+  middleware:
+    build: .
+    container_name: lilygo-middleware
+    ports:
+      - "5000:5000"
+    volumes:
+      # Mount config directory for persistent configuration
+      - ./config:/app/config
+    environment:
+      # Optional: Configure via environment variables instead of config file
+      # Uncomment and set values as needed
+      # - OPENWEATHERMAP_API_KEY=your_actual_key_here
+      # - WEATHER_CITY=Sydney
+      # - WEATHER_COUNTRY=AU
+      # - WEATHER_UNITS=metric
+      # - COINGECKO_API_KEY=your_actual_key_here
+      # - CRYPTO_SYMBOL=btc
+      # - MARKETSTACK_API_KEY=your_actual_key_here
+      # - STOCK_SYMBOL=AAPL
+      # - TRANSPORTNSW_API_KEY=your_actual_key_here
+      # - TRAIN_ORIGIN=10101100
+      # - TRAIN_DESTINATION=10101331
+      - PORT=5000
+      - HOST=0.0.0.0
+      - DEBUG=false
+    restart: unless-stopped
+    networks:
+      - lilygo-network
+
+networks:
+  lilygo-network:
+    driver: bridge

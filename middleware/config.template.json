@@ -1,0 +1,21 @@
+{
+  "weather": {
+    "api_key": "YOUR_OPENWEATHERMAP_API_KEY",
+    "city": "Sydney",
+    "country": "AU",
+    "units": "metric"
+  },
+  "crypto": {
+    "api_key": "YOUR_COINGECKO_API_KEY",
+    "symbol": "btc"
+  },
+  "stock": {
+    "api_key": "YOUR_MARKETSTACK_API_KEY",
+    "symbol": "AAPL"
+  },
+  "train": {
+    "api_key": "YOUR_TRANSPORTNSW_API_KEY",
+    "origin": "ORIGIN_STATION_ID",
+    "destination": "DESTINATION_STATION_ID"
+  }
+}

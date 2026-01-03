@@ -1,7 +1,13 @@
 {
+  "_comment": "LILYGO T5 Display Configuration - Edit this file with your settings",
   "wifi": {
     "ssid": "YOUR_WIFI_SSID",
     "password": "YOUR_WIFI_PASSWORD"
+  },
+  "middleware": {
+    "_comment": "Optional battery optimization: Enable this to fetch all data from a local middleware server instead of calling external APIs directly. This reduces WiFi active time from 10-15s to 1-2s per update, extending battery life from 3-5 days to 7-10 days. Only enable if you have deployed the middleware service (see middleware/MIDDLEWARE_SETUP.md).",
+    "enabled": false,
+    "url": "http://192.168.1.100:5000/api/data"
   },
   "weather": {
     "api_key": "YOUR_OPENWEATHERMAP_API_KEY",

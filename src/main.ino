@@ -47,6 +47,10 @@
 String ssid = "";
 String password = "";
 
+// Middleware configuration (loaded from config.json)
+bool middleware_enabled = false;
+String middleware_url = "";
+
 // OpenWeatherMap API (loaded from config.json)
 String owm_api_key = "";
 String city = "";
@@ -232,17 +236,24 @@ void setup() {
     // Clear the screen
     epd_clear();
 
-    // Fetch weather data
-    fetchWeatherData();
-    
-    // Fetch crypto data
-    fetchCryptoData();
-    
-    // Fetch stock data
-    fetchStockData();
-    
-    // Fetch train data
-    fetchTrainData();
+    // Fetch data from middleware or individual APIs
+    if (middleware_enabled) {
+        Serial.println("Using middleware mode");
+        fetchMiddlewareData();
+    } else {
+        Serial.println("Using direct API mode");
+        // Fetch weather data
+        fetchWeatherData();
+        
+        // Fetch crypto data
+        fetchCryptoData();
+        
+        // Fetch stock data
+        fetchStockData();
+        
+        // Fetch train data
+        fetchTrainData();
+    }
     
     // Display weather
     displayWeather();
@@ -256,23 +267,30 @@ void setup() {
 void loop() {
     // Check if it's time to update
     if (millis() - last_update > UPDATE_INTERVAL) {
-        Serial.println("\nTime to refresh weather data...");
+        Serial.println("\nTime to refresh data...");
         
         // Power up display
         epd_poweron();
         epd_clear();
         
-        // Fetch and display
-        fetchWeatherData();
-        
-        // Fetch train data
-        fetchTrainData();
-        
-        // Only update crypto/stock data every 12 loops
-        loop_count++;
-        if (loop_count % 12 == 0) {
-            fetchCryptoData();
-            fetchStockData();
+        // Fetch data from middleware or individual APIs
+        if (middleware_enabled) {
+            Serial.println("Using middleware mode");
+            fetchMiddlewareData();
+        } else {
+            Serial.println("Using direct API mode");
+            // Fetch and display
+            fetchWeatherData();
+            
+            // Fetch train data
+            fetchTrainData();
+            
+            // Only update crypto/stock data every 12 loops
+            loop_count++;
+            if (loop_count % 12 == 0) {
+                fetchCryptoData();
+                fetchStockData();
+            }
         }
         
         displayWeather();
@@ -309,6 +327,178 @@ void connectToWiFi() {
         Serial.println("\nFailed to connect to WiFi");
         current_condition = "WiFi Error";
     }
+}
+
+// Helper function to parse UTC ISO 8601 timestamp and convert to local time string
+String parseUTCToLocal(const String& utc_timestamp) {
+    if (utc_timestamp.length() < 19) {
+        return "--:--";
+    }
+    
+    int year = atoi(utc_timestamp.substring(0, 4).c_str());
+    int month = atoi(utc_timestamp.substring(5, 7).c_str());
+    int day = atoi(utc_timestamp.substring(8, 10).c_str());
+    int hour = atoi(utc_timestamp.substring(11, 13).c_str());
+    int minute = atoi(utc_timestamp.substring(14, 16).c_str());
+    int second = atoi(utc_timestamp.substring(17, 19).c_str());
+    
+    struct tm timeinfo = {};
+    timeinfo.tm_year = year - 1900;
+    timeinfo.tm_mon = month - 1;
+    timeinfo.tm_mday = day;
+    timeinfo.tm_hour = hour;
+    timeinfo.tm_min = minute;
+    timeinfo.tm_sec = second;
+    timeinfo.tm_isdst = 0;
+    
+    // Use setenv to temporarily set timezone to UTC for mktime
+    setenv("TZ", "UTC", 1);
+    tzset();
+    time_t utc_time = mktime(&timeinfo);
+    
+    // Convert to local timezone using Timezone library
+    TimeChangeRule *tcr;
+    time_t local_time = ausET.toLocal(utc_time, &tcr);
+    struct tm *local_timeinfo = localtime(&local_time);
+    
+    // Format as HH:MMAM/PM
+    char time_buffer[20];
+    int hour_12 = local_timeinfo->tm_hour % 12;
+    if (hour_12 == 0) hour_12 = 12;
+    const char *am_pm = local_timeinfo->tm_hour >= 12 ? "PM" : "AM";
+    snprintf(time_buffer, sizeof(time_buffer), "%02d:%02d%s", hour_12, local_timeinfo->tm_min, am_pm);
+    
+    return String(time_buffer);
+}
+
+void fetchMiddlewareData() {
+    if (WiFi.status() != WL_CONNECTED) {
+        Serial.println("WiFi not connected, skipping middleware update");
+        current_condition = "No WiFi";
+        return;
+    }
+    
+    Serial.println("Fetching data from middleware...");
+    Serial.print("Middleware URL: ");
+    Serial.println(middleware_url);
+    
+    HTTPClient http;
+    http.begin(middleware_url);
+    
+    // Use GET method for middleware (RESTful data retrieval)
+    int httpCode = http.GET();
+    
+    if (httpCode == 200) {
+        String payload = http.getString();
+        Serial.println("Middleware Response received");
+        
+        // Parse JSON response
+        JsonDocument doc;
+        DeserializationError error = deserializeJson(doc, payload);
+        
+        if (!error) {
+            // Parse weather data
+            if (doc.containsKey("weather") && !doc["weather"].containsKey("error")) {
+                JsonObject weather = doc["weather"];
+                float temp = weather["temp"] | 0.0;
+                float feels = weather["feels_like"] | 0.0;
+                float t_max = weather["temp_max"] | 0.0;
+                float t_min = weather["temp_min"] | 0.0;
+                int humidity = weather["humidity"] | 0;
+                float wind = weather["wind_speed"] | 0.0;
+                const char* condition = weather["condition"] | "Unknown";
+                const char* icon = weather["icon_code"] | "01d";
+                
+                current_temp = String(temp, 0) + "°C";
+                feels_like = String(feels, 0) + "°C";
+                temp_max = String(t_max, 0);
+                temp_min = String(t_min, 0);
+                current_humidity = String(humidity) + "%";
+                wind_speed = String(wind, 0) + " m/s";
+                current_condition = condition;
+                current_icon_code = icon;
+                
+                Serial.println("Weather data parsed from middleware");
+            } else {
+                Serial.println("Weather data not available from middleware");
+            }
+            
+            // Parse crypto data
+            if (doc.containsKey("crypto") && !doc["crypto"].containsKey("error")) {
+                JsonObject crypto = doc["crypto"];
+                int price = crypto["price"] | 0;
+                float change = crypto["change_24h"] | 0.0;
+                
+                crypto_price = String(price);
+                
+                char change_buffer[20];
+                if (change >= 0) {
+                    snprintf(change_buffer, sizeof(change_buffer), "+%.2f", change);
+                } else {
+                    snprintf(change_buffer, sizeof(change_buffer), "%.2f", change);
+                }
+                crypto_change = change_buffer;
+                
+                Serial.println("Crypto data parsed from middleware");
+            } else {
+                Serial.println("Crypto data not available from middleware");
+            }
+            
+            // Parse stock data
+            if (doc.containsKey("stock") && !doc["stock"].containsKey("error")) {
+                JsonObject stock = doc["stock"];
+                float price = stock["price"] | 0.0;
+                const char* currency = stock["currency"] | "USD";
+                float change = stock["change"] | 0.0;
+                
+                stock_currency = currency;
+                
+                char price_buffer[20];
+                snprintf(price_buffer, sizeof(price_buffer), "%.2f", price);
+                stock_price = price_buffer;
+                
+                char change_buffer[20];
+                if (change >= 0) {
+                    snprintf(change_buffer, sizeof(change_buffer), "+%.2f", change);
+                } else {
+                    snprintf(change_buffer, sizeof(change_buffer), "%.2f", change);
+                }
+                stock_change = change_buffer;
+                
+                Serial.println("Stock data parsed from middleware");
+            } else {
+                Serial.println("Stock data not available from middleware");
+            }
+            
+            // Parse train data
+            if (doc.containsKey("train") && !doc["train"].containsKey("error")) {
+                JsonObject train = doc["train"];
+                const char* dep_time_utc = train["departure_time"] | "";
+                const char* via_dest = train["via"] | "--";
+                
+                train_via = via_dest;
+                
+                // Parse ISO 8601 datetime string and convert to local time
+                train_departure_time = parseUTCToLocal(dep_time_utc);
+                
+                Serial.println("Train data parsed from middleware");
+            } else {
+                Serial.println("Train data not available from middleware");
+            }
+            
+            Serial.println("All data fetched successfully from middleware");
+        } else {
+            Serial.print("JSON parsing error: ");
+            Serial.println(error.c_str());
+            current_condition = "Parse Error";
+        }
+    } else {
+        Serial.print("Middleware HTTP Error: ");
+        Serial.println(httpCode);
+        current_condition = "Middleware Error";
+    }
+    
+    http.end();
 }
 
 void fetchWeatherData() {
@@ -505,46 +695,8 @@ void fetchTrainData() {
             Serial.print("Departure time UTC: ");
             Serial.println(dep_time_utc);
             
-            // Parse ISO 8601 datetime string and convert to ausET time
-            // Format: "2026-01-01T11:05:30Z"
-            if (String(dep_time_utc).length() > 0) {
-                // Parse the ISO string manually
-                int year = atoi(String(dep_time_utc).substring(0, 4).c_str());
-                int month = atoi(String(dep_time_utc).substring(5, 7).c_str());
-                int day = atoi(String(dep_time_utc).substring(8, 10).c_str());
-                int hour = atoi(String(dep_time_utc).substring(11, 13).c_str());
-                int minute = atoi(String(dep_time_utc).substring(14, 16).c_str());
-                int second = atoi(String(dep_time_utc).substring(17, 19).c_str());
-                
-                // Create time_t from parsed values (assuming UTC)
-                struct tm timeinfo = {};
-                timeinfo.tm_year = year - 1900;
-                timeinfo.tm_mon = month - 1;
-                timeinfo.tm_mday = day;
-                timeinfo.tm_hour = hour;
-                timeinfo.tm_min = minute;
-                timeinfo.tm_sec = second;
-                timeinfo.tm_isdst = 0;  // UTC has no DST
-                
-                time_t utc_time = mktime(&timeinfo);
-                // Adjust for UTC (mktime assumes local time)
-                utc_time -= timezone.toInt() * 3600;  // This is a workaround, better to use proper UTC handling
-                
-                // Convert to ausET timezone
-                TimeChangeRule *tcr;
-                time_t local_time = ausET.toLocal(utc_time, &tcr);
-                
-                struct tm *local_timeinfo = localtime(&local_time);
-                
-                // Format as HH:MMAM/PM
-                char time_buffer[20];
-                int hour_12 = local_timeinfo->tm_hour % 12;
-                if (hour_12 == 0) hour_12 = 12;
-                const char *am_pm = local_timeinfo->tm_hour >= 12 ? "PM" : "AM";
-                snprintf(time_buffer, sizeof(time_buffer), "%02d:%02d%s", hour_12, local_timeinfo->tm_min, am_pm);
-                
-                train_departure_time = time_buffer;
-            }
+            // Parse ISO 8601 datetime string and convert to local time
+            train_departure_time = parseUTCToLocal(dep_time_utc);
             
             Serial.print("Train departure time: ");
             Serial.println(train_departure_time);
@@ -939,6 +1091,19 @@ bool loadConfig() {
     ssid = doc["wifi"]["ssid"].as<String>();
     password = doc["wifi"]["password"].as<String>();
     
+    // Extract middleware config (optional)
+    if (doc.containsKey("middleware")) {
+        middleware_enabled = doc["middleware"]["enabled"] | false;
+        middleware_url = doc["middleware"]["url"].as<String>();
+        
+        Serial.print("Middleware enabled: ");
+        Serial.println(middleware_enabled ? "YES" : "NO");
+        if (middleware_enabled) {
+            Serial.print("Middleware URL: ");
+            Serial.println(middleware_url);
+        }
+    }
+    
     // Extract weather config
     owm_api_key = doc["weather"]["api_key"].as<String>();
     city = doc["weather"]["city"].as<String>();
@@ -967,11 +1132,35 @@ bool loadConfig() {
     UPDATE_INTERVAL = update_minutes * 60 * 1000;
     
     // Validate loaded config
-    if (ssid.isEmpty() || password.isEmpty() || owm_api_key.isEmpty() || city.isEmpty() || 
-        ntp_server.isEmpty() || timezone.isEmpty() || coingecko_api_key.isEmpty() || crypto_symbol.isEmpty() ||
-        transportnsw_api_key.isEmpty() || origin_station_id.isEmpty() || destination_station_id.isEmpty()) {
-        Serial.println("ERROR: Incomplete configuration in config.json");
+    // WiFi and NTP are always required
+    if (ssid.isEmpty() || password.isEmpty() || ntp_server.isEmpty() || timezone.isEmpty()) {
+        Serial.println("ERROR: WiFi or NTP configuration missing in config.json");
         return false;
+    }
+    
+    // If middleware is enabled, validate middleware URL
+    if (middleware_enabled) {
+        if (middleware_url.isEmpty()) {
+            Serial.println("ERROR: Middleware enabled but URL not provided");
+            return false;
+        }
+        
+        // Basic URL format validation: require http:// or https:// prefix
+        if (!(middleware_url.startsWith("http://") || middleware_url.startsWith("https://"))) {
+            Serial.println("ERROR: Middleware URL must start with \"http://\" or \"https://\"");
+            return false;
+        }
+        
+        Serial.println("Config validated for middleware mode");
+        Serial.print("Middleware URL: ");
+        Serial.println(middleware_url);
+    } else {
+        // Direct API mode: validate required API keys
+        if (owm_api_key.isEmpty() || city.isEmpty()) {
+            Serial.println("ERROR: Weather API configuration missing in config.json");
+            return false;
+        }
+        Serial.println("Config validated for direct API mode");
     }
     
     Serial.println("Config loaded successfully!");
