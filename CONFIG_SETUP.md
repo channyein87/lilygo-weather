@@ -286,9 +286,11 @@ Watch the serial output for:
 | Key | Type | Example | Notes |
 |-----|------|---------|-------|
 | `crypto.api_key` | String | "CG-abc123...xyz" | From coingecko.com |
-| `crypto.symbol` | String | "btc" | Lowercase crypto symbol |
+| `crypto.symbol` | String | "btc" | Lowercase crypto symbol (auto-mapped to CoinGecko ID) |
 
-**Popular Symbols:** btc, eth, ada, sol, bnb, xrp, doge, dot, matic
+**Popular Symbols:** btc, eth, ada, sol, bnb, xrp, doge, dot, matic, avax, link, uni
+
+**Note:** Common symbols are automatically mapped to CoinGecko IDs (e.g., btc → bitcoin). You can also use CoinGecko IDs directly (e.g., "bitcoin", "ethereum").
 
 ### Stock Market Settings (Optional)
 | Key | Type | Example | Notes |

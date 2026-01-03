@@ -89,21 +89,40 @@ def fetch_crypto_data():
         if not api_key:
             return {'error': 'Crypto API key not configured'}
         
-        url = f"https://api.coingecko.com/api/v3/simple/price?ids={symbol}&vs_currencies=usd&include_24hr_change=true"
+        # Map common symbols to CoinGecko IDs
+        symbol_to_id = {
+            'btc': 'bitcoin',
+            'eth': 'ethereum',
+            'ada': 'cardano',
+            'sol': 'solana',
+            'bnb': 'binancecoin',
+            'xrp': 'ripple',
+            'doge': 'dogecoin',
+            'dot': 'polkadot',
+            'matic': 'matic-network',
+            'avax': 'avalanche-2',
+            'link': 'chainlink',
+            'uni': 'uniswap'
+        }
+        
+        # Convert symbol to CoinGecko ID if it's a known symbol, otherwise use as-is
+        coin_id = symbol_to_id.get(symbol, symbol)
+        
+        url = f"https://api.coingecko.com/api/v3/simple/price?ids={coin_id}&vs_currencies=usd&include_24hr_change=true"
         headers = {'x-cg-demo-api-key': api_key}
         response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()
         
         data = response.json()
         
-        if symbol in data:
+        if coin_id in data:
             return {
                 'symbol': symbol.upper(),
-                'price': int(data[symbol].get('usd', 0)),
-                'change_24h': round(data[symbol].get('usd_24h_change', 0), 2)
+                'price': int(data[coin_id].get('usd', 0)),
+                'change_24h': round(data[coin_id].get('usd_24h_change', 0), 2)
             }
         else:
-            return {'error': 'Crypto symbol not found'}
+            return {'error': f'Crypto symbol/ID not found: {symbol}'}
     except Exception as e:
         print(f"Error fetching crypto data: {e}")
         return {'error': str(e)}

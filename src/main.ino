@@ -455,9 +455,12 @@ void fetchMiddlewareData() {
                     timeinfo.tm_sec = second;
                     timeinfo.tm_isdst = 0;
                     
+                    // Use setenv to temporarily set timezone to UTC for mktime
+                    setenv("TZ", "UTC", 1);
+                    tzset();
                     time_t utc_time = mktime(&timeinfo);
-                    utc_time -= timezone.toInt() * 3600;
                     
+                    // Convert to local timezone using Timezone library
                     TimeChangeRule *tcr;
                     time_t local_time = ausET.toLocal(utc_time, &tcr);
                     struct tm *local_timeinfo = localtime(&local_time);
@@ -706,9 +709,10 @@ void fetchTrainData() {
                 timeinfo.tm_sec = second;
                 timeinfo.tm_isdst = 0;  // UTC has no DST
                 
+                // Use setenv to temporarily set timezone to UTC for mktime
+                setenv("TZ", "UTC", 1);
+                tzset();
                 time_t utc_time = mktime(&timeinfo);
-                // Adjust for UTC (mktime assumes local time)
-                utc_time -= timezone.toInt() * 3600;  // This is a workaround, better to use proper UTC handling
                 
                 // Convert to ausET timezone
                 TimeChangeRule *tcr;
