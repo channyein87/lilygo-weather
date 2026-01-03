@@ -2,9 +2,30 @@
 
 A complete information display application for the **LILYGO T5 4.7" e-paper display** featuring weather, cryptocurrency prices, stock market data, and train schedules. Pure C++ firmware with automatic updates, low-power operation, and LittleFS configuration storage.
 
+## Architecture Options
+
+This project supports two modes of operation:
+
+### 🔋 Middleware Mode (Recommended for Battery Life)
+- Display board makes **1 single API request** to a local middleware service
+- Middleware aggregates data from all upstream APIs
+- **2-3x longer battery life** (7-10 days vs 3-5 days)
+- Requires a Raspberry Pi or Linux machine on the same network
+- See [Middleware Setup Guide](middleware/MIDDLEWARE_SETUP.md)
+
+### 📡 Direct API Mode (Default)
+- Display board directly calls each API (weather, crypto, stock, train)
+- No additional hardware required
+- Standard battery life (3-5 days)
+- Original behavior, fully backward compatible
+
+---
+
 ## Quick Start
 
-### 1. Get API Keys (5 minutes)
+### Option 1: Direct API Mode (Default)
+
+#### 1. Get API Keys (5 minutes)
 
 **Required:**
 - **OpenWeatherMap** (weather data): https://openweathermap.org/api - Free tier: 1000 calls/day
@@ -14,7 +35,7 @@ A complete information display application for the **LILYGO T5 4.7" e-paper disp
 - **MarketStack** (stock market data): https://marketstack.com/ - Free tier: 100 calls/month
 - **Transport NSW** (Sydney train schedules): https://opendata.transport.nsw.gov.au/ - Free with registration
 
-### 2. Configure Device (5 minutes)
+#### 2. Configure Device (5 minutes)
 
 Copy the template and edit `data/config.json` with your settings:
 
@@ -27,6 +48,10 @@ cp data/config.template.json data/config.json
   "wifi": {
     "ssid": "YOUR_WIFI_SSID",
     "password": "YOUR_WIFI_PASSWORD"
+  },
+  "middleware": {
+    "enabled": false,
+    "url": ""
   },
   "weather": {
     "api_key": "YOUR_OPENWEATHERMAP_API_KEY",
@@ -57,7 +82,7 @@ cp data/config.template.json data/config.json
 
 **Note:** All API keys except OpenWeatherMap are optional. If you don't provide keys for crypto, stock, or train APIs, those sections will show placeholder values.
 
-### 3. Build & Upload (3 minutes)
+#### 3. Build & Upload (3 minutes)
 ```bash
 # Upload configuration to device
 pio run -t uploadfs
@@ -73,6 +98,55 @@ pio device monitor -b 115200
 
 ---
 
+### Option 2: Middleware Mode (Better Battery Life)
+
+#### 1. Deploy Middleware
+
+Follow the [Middleware Setup Guide](middleware/MIDDLEWARE_SETUP.md) to deploy the middleware service on a Raspberry Pi or Linux machine.
+
+Quick steps:
+```bash
+cd middleware
+mkdir -p config
+cp config.template.json config/config.json
+# Edit config/config.json with your API keys
+docker-compose up -d
+```
+
+#### 2. Configure Display Board
+
+Edit `data/config.json` with middleware settings:
+
+```json
+{
+  "wifi": {
+    "ssid": "YOUR_WIFI_SSID",
+    "password": "YOUR_WIFI_PASSWORD"
+  },
+  "middleware": {
+    "enabled": true,
+    "url": "http://192.168.1.100:5000/api/data"
+  },
+  "ntp": {
+    "server": "au.pool.ntp.org",
+    "timezone": "Australia/Sydney"
+  },
+  "update_interval_minutes": 5
+}
+```
+
+**Note:** When middleware is enabled, you don't need to provide API keys in the display board config - they're configured in the middleware.
+
+#### 3. Build & Upload
+
+```bash
+pio run -t uploadfs && pio run -t upload
+```
+
+**Result:** 2-3x longer battery life! 🎉
+
+---
+
 ## Features
 
 ✅ **Real-time Weather** - Temperature, conditions, humidity, wind speed (OpenWeatherMap)  
@@ -81,7 +155,8 @@ pio device monitor -b 115200
 ✅ **Train Schedules** - Next departure times for Sydney trains (Transport NSW)  
 ✅ **Automatic Time Sync** - NTP-based time synchronization with timezone support  
 ✅ **Automatic Updates** - Configurable update interval (1-60 minutes)  
-✅ **Low Power** - 5-10 day battery life with typical usage  
+✅ **Low Power** - 5-10 day battery life with middleware, 3-5 days direct mode
+✅ **Middleware Support** - Optional local API aggregation for better battery life  
 ✅ **WiFi Ready** - Auto-reconnection with error handling  
 ✅ **Configuration Storage** - All credentials stored in LittleFS, no firmware edits needed  
 ✅ **Well-Documented** - Complete setup in 15 minutes  
@@ -210,10 +285,18 @@ Update: 27 Dec 2023 @ 14:30
 
 ```
 src/
-└── main.ino                 # Firmware (no user edits needed)
+└── main.ino                 # Firmware (supports both direct and middleware modes)
 data/
 ├── config.json              # Your settings (created from template)
 └── config.template.json     # Configuration template
+middleware/
+├── app.py                   # Middleware Flask application
+├── Dockerfile               # Docker container definition
+├── docker-compose.yml       # Docker Compose configuration
+├── requirements.txt         # Python dependencies
+├── config.template.json     # Middleware configuration template
+├── MIDDLEWARE_SETUP.md      # Detailed middleware setup guide
+└── README.md                # Middleware quick start
 boards/
 └── T5-ePaper-S3.json       # Board definition
 lib/
@@ -224,6 +307,43 @@ README.md                   # This file
 CONFIG_SETUP.md             # Detailed configuration guide
 LilyGo_API_Reference.md     # Display library API documentation
 ```
+
+---
+
+## Architecture
+
+### Direct API Mode (Default)
+```
+┌─────────────────┐
+│  LILYGO T5      │
+│  Display Board  │
+└─────────────────┘
+        │
+        ├─────────► OpenWeatherMap API
+        ├─────────► CoinGecko API
+        ├─────────► MarketStack API
+        └─────────► Transport NSW API
+```
+
+**Pros:** Simple setup, no additional hardware  
+**Cons:** More WiFi active time, shorter battery life
+
+### Middleware Mode (Recommended)
+```
+┌─────────────────┐
+│  LILYGO T5      │
+│  Display Board  │──────► Middleware (1 request)
+└─────────────────┘              │
+                                 ├─────► OpenWeatherMap API
+                                 ├─────► CoinGecko API
+                                 ├─────► MarketStack API
+                                 └─────► Transport NSW API
+```
+
+**Pros:** 2-3x longer battery life, less network traffic  
+**Cons:** Requires Raspberry Pi or Linux machine
+
+See [Middleware Setup Guide](middleware/MIDDLEWARE_SETUP.md) for details.
 
 ---
 

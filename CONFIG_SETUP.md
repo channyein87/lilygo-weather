@@ -3,22 +3,33 @@
 ## Overview
 This project reads configuration (WiFi credentials, API keys, preferences) from a `config.json` file stored in the device's LittleFS filesystem. This prevents accidentally committing credentials to version control and allows easy reconfiguration without recompiling firmware.
 
+The display supports two operating modes:
+
+### Direct API Mode (Default)
+The display board directly calls each API service (weather, crypto, stock, train). This is the simplest setup but uses more battery power.
+
+### Middleware Mode (Recommended for Battery Life)
+The display board makes a single request to a local middleware service that aggregates data from all upstream APIs. This significantly improves battery life (2-3x improvement).
+
 The display supports multiple data sources:
-- **Weather** (OpenWeatherMap) - Required
+- **Weather** (OpenWeatherMap) - Required in direct mode
 - **Cryptocurrency** (CoinGecko) - Optional
 - **Stock Market** (MarketStack) - Optional
 - **Train Schedules** (Transport NSW) - Optional, Sydney area only
-- **Time Sync** (NTP) - Required
+- **Time Sync** (NTP) - Always required
+- **Middleware** - Optional, provides aggregated data
 
 ## Setup Steps
 
-### 1. Copy the Template
+### Option 1: Direct API Mode (Default)
+
+#### 1. Copy the Template
 ```bash
 cd data
 cp config.template.json config.json
 ```
 
-### 2. Edit `config.json`
+#### 2. Edit `config.json`
 
 Open `data/config.json` in your editor and fill in your actual values:
 
@@ -27,6 +38,10 @@ Open `data/config.json` in your editor and fill in your actual values:
   "wifi": {
     "ssid": "YOUR_WIFI_SSID",
     "password": "YOUR_WIFI_PASSWORD"
+  },
+  "middleware": {
+    "enabled": false,
+    "url": ""
   },
   "weather": {
     "api_key": "YOUR_OPENWEATHERMAP_API_KEY",
@@ -57,7 +72,7 @@ Open `data/config.json` in your editor and fill in your actual values:
 
 **Important:**
 - WiFi SSID and password are case-sensitive
-- OpenWeatherMap API key is required (64 characters)
+- OpenWeatherMap API key is required (64 characters) in direct mode
 - NTP server and timezone are required for accurate time display
 - CoinGecko, MarketStack, and Transport NSW APIs are optional
 - City name should be in English (e.g., "Sydney" not "Sídney")
@@ -100,7 +115,95 @@ Open `data/config.json` in your editor and fill in your actual values:
   - Browse the [station list](https://opendata.transport.nsw.gov.au/documentation) or use the Trip Planner API
   - Example: Town Hall = "10101100", Central = "10101331"
 
-### 4. Upload Configuration to Device
+---
+
+### Option 2: Middleware Mode (Better Battery Life)
+
+#### 1. Deploy Middleware Service
+
+First, set up the middleware service on a Raspberry Pi or Linux machine. See the [Middleware Setup Guide](middleware/MIDDLEWARE_SETUP.md) for detailed instructions.
+
+Quick deployment:
+```bash
+cd middleware
+mkdir -p config
+cp config.template.json config/config.json
+# Edit config/config.json with your API keys
+docker-compose up -d
+```
+
+Find your middleware IP address:
+```bash
+hostname -I
+# Example output: 192.168.1.100
+```
+
+#### 2. Configure Display Board
+
+Edit `data/config.json` with minimal settings:
+
+```json
+{
+  "wifi": {
+    "ssid": "YOUR_WIFI_SSID",
+    "password": "YOUR_WIFI_PASSWORD"
+  },
+  "middleware": {
+    "enabled": true,
+    "url": "http://192.168.1.100:5000/api/data"
+  },
+  "ntp": {
+    "server": "au.pool.ntp.org",
+    "timezone": "Australia/Sydney"
+  },
+  "weather": {
+    "api_key": "",
+    "city": "Sydney",
+    "country": "AU",
+    "units": "metric"
+  },
+  "crypto": {
+    "api_key": "",
+    "symbol": "btc"
+  },
+  "stock": {
+    "api_key": "",
+    "symbol": "AAPL"
+  },
+  "train": {
+    "api_key": "",
+    "origin": "10101100",
+    "destination": "10101331"
+  },
+  "update_interval_minutes": 5
+}
+```
+
+**Important for Middleware Mode:**
+- Set `middleware.enabled` to `true`
+- Set `middleware.url` to your middleware IP and port
+- API keys can be left empty (they're configured in the middleware)
+- WiFi and NTP settings are still required
+- City, symbols, and other settings can be left for reference but are ignored
+
+#### 3. Test Middleware Connection
+
+Before uploading to the device, verify the middleware is accessible:
+
+```bash
+# From your computer on the same network:
+curl http://192.168.1.100:5000/health
+# Should return: {"status":"healthy","timestamp":"..."}
+
+curl http://192.168.1.100:5000/api/data
+# Should return aggregated data from all APIs
+```
+
+---
+
+### Upload Configuration to Device (Both Modes)
+
+#### 4. Upload Configuration to Device
 ```bash
 pio run -t uploadfs
 ```
@@ -109,20 +212,21 @@ This uploads the LittleFS filesystem containing `config.json` to your ESP32.
 
 **First Time Setup:** You should do this once before uploading firmware. If you see errors, try again - sometimes the first attempt fails.
 
-### 5. Upload Firmware
+#### 5. Upload Firmware
 ```bash
 pio run -t upload
 ```
 
 This uploads the firmware to your ESP32. The device will now read configuration from the stored `config.json`.
 
-### 6. Verify Success
+#### 6. Verify Success
 ```bash
 pio device monitor -b 115200
 ```
 
 Watch the serial output for:
 - "Config loaded successfully" - configuration was read
+- "Middleware enabled: YES" or "Middleware enabled: NO" - mode detected
 - "WiFi connected!" - device connected to WiFi
 - "Weather data parsed successfully" - Weather API call worked
 - "Crypto data parsed successfully" - CoinGecko API call worked (if configured)
@@ -131,16 +235,24 @@ Watch the serial output for:
 
 ## Configuration Options
 
-### WiFi Settings (Required)
+### WiFi Settings (Required - Both Modes)
 | Key | Type | Example | Notes |
 |-----|------|---------|-------|
 | `wifi.ssid` | String | "MyNetwork" | Your WiFi network name (2.4GHz only) |
 | `wifi.password` | String | "password123" | Your WiFi password |
 
-### Weather Settings (Required)
+### Middleware Settings (Optional)
 | Key | Type | Example | Notes |
 |-----|------|---------|-------|
-| `weather.api_key` | String | "abc123...xyz" | From openweathermap.org (64 chars) |
+| `middleware.enabled` | Boolean | true | Enable middleware mode (default: false) |
+| `middleware.url` | String | "http://192.168.1.100:5000/api/data" | URL to middleware API endpoint |
+
+**Note:** When middleware is enabled, API keys on the display board are not required - they are configured in the middleware instead.
+
+### Weather Settings (Required in Direct Mode)
+| Key | Type | Example | Notes |
+|-----|------|---------|-------|
+| `weather.api_key` | String | "abc123...xyz" | From openweathermap.org (64 chars, not required in middleware mode) |
 | `weather.city` | String | "Sydney" | City name in English |
 | `weather.country` | String | "AU" | ISO 3166 country code (2 letters) |
 | `weather.units` | String | "metric" | "metric" (°C) or "imperial" (°F) |
