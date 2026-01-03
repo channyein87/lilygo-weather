@@ -3,11 +3,12 @@ LILYGO T5 Weather Display - Middleware API
 Aggregates data from multiple upstream APIs to optimize battery life on display board
 """
 
-from flask import Flask, request, jsonify
+from flask import Flask, jsonify
 import requests
 import os
 import json
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor
 
 app = Flask(__name__)
 
@@ -55,6 +56,23 @@ def load_config():
             "Set 'weather.api_key' in the config file or the OPENWEATHERMAP_API_KEY environment variable."
         )
     
+    # Warn about placeholder values
+    if api_key.startswith('YOUR_'):
+        print("WARNING: Weather API key appears to be a placeholder value. Please update config.json with your actual API key.")
+    
+    # Check other optional API keys for placeholders
+    crypto_key = config_data.get('crypto', {}).get('api_key', '')
+    if crypto_key and crypto_key.startswith('YOUR_'):
+        print("WARNING: CoinGecko API key appears to be a placeholder value.")
+    
+    stock_key = config_data.get('stock', {}).get('api_key', '')
+    if stock_key and stock_key.startswith('YOUR_'):
+        print("WARNING: MarketStack API key appears to be a placeholder value.")
+    
+    train_key = config_data.get('train', {}).get('api_key', '')
+    if train_key and train_key.startswith('YOUR_'):
+        print("WARNING: Transport NSW API key appears to be a placeholder value.")
+    
     return config_data
 
 config = load_config()
@@ -89,6 +107,13 @@ def fetch_weather_data():
             'city': city,
             'units': units
         }
+    except requests.exceptions.HTTPError as e:
+        status_code = e.response.status_code if e.response else 'unknown'
+        print(f"Error fetching weather data: HTTP {status_code} - {e}")
+        return {'error': f'HTTP {status_code}: {str(e)}'}
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching weather data: Network error - {e}")
+        return {'error': f'Network error: {str(e)}'}
     except Exception as e:
         print(f"Error fetching weather data: {e}")
         return {'error': str(e)}
@@ -137,6 +162,13 @@ def fetch_crypto_data():
             }
         else:
             return {'error': f'Crypto symbol/ID not found: {symbol}'}
+    except requests.exceptions.HTTPError as e:
+        status_code = e.response.status_code if e.response else 'unknown'
+        print(f"Error fetching crypto data: HTTP {status_code} - {e}")
+        return {'error': f'HTTP {status_code}: {str(e)}'}
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching crypto data: Network error - {e}")
+        return {'error': f'Network error: {str(e)}'}
     except Exception as e:
         print(f"Error fetching crypto data: {e}")
         return {'error': str(e)}
@@ -166,11 +198,18 @@ def fetch_stock_data():
             return {
                 'symbol': symbol,
                 'price': round(close_price, 2),
-                'currency': stock_data.get('exchange', 'USD'),
+                'currency': 'USD',  # MarketStack free tier is US stocks only
                 'change': round(change, 2)
             }
         else:
             return {'error': 'Stock symbol not found'}
+    except requests.exceptions.HTTPError as e:
+        status_code = e.response.status_code if e.response else 'unknown'
+        print(f"Error fetching stock data: HTTP {status_code} - {e}")
+        return {'error': f'HTTP {status_code}: {str(e)}'}
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching stock data: Network error - {e}")
+        return {'error': f'Network error: {str(e)}'}
     except Exception as e:
         print(f"Error fetching stock data: {e}")
         return {'error': str(e)}
@@ -228,6 +267,13 @@ def fetch_train_data():
                 }
         
         return {'error': 'No train data available'}
+    except requests.exceptions.HTTPError as e:
+        status_code = e.response.status_code if e.response else 'unknown'
+        print(f"Error fetching train data: HTTP {status_code} - {e}")
+        return {'error': f'HTTP {status_code}: {str(e)}'}
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching train data: Network error - {e}")
+        return {'error': f'Network error: {str(e)}'}
     except Exception as e:
         print(f"Error fetching train data: {e}")
         return {'error': str(e)}
@@ -243,15 +289,28 @@ def health_check():
 @app.route('/api/data', methods=['POST', 'GET'])
 def get_aggregated_data():
     """
-    Main endpoint that aggregates all data sources
-    Accepts POST or GET requests
+    Main endpoint that aggregates all data sources.
+    
+    This endpoint is read-only and has no side effects, so GET is the
+    semantically correct and preferred HTTP method.
+    
+    POST is also accepted for backward compatibility with existing
+    ESP32 firmware, which issues POST requests with an empty body
+    when fetching the aggregated data.
     """
     try:
-        # Fetch all data in parallel (could be optimized with threading)
-        weather = fetch_weather_data()
-        crypto = fetch_crypto_data()
-        stock = fetch_stock_data()
-        train = fetch_train_data()
+        # Fetch all data in parallel for better performance
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            weather_future = executor.submit(fetch_weather_data)
+            crypto_future = executor.submit(fetch_crypto_data)
+            stock_future = executor.submit(fetch_stock_data)
+            train_future = executor.submit(fetch_train_data)
+            
+            # Wait for all results
+            weather = weather_future.result()
+            crypto = crypto_future.result()
+            stock = stock_future.result()
+            train = train_future.result()
         
         response = {
             'timestamp': datetime.utcnow().isoformat(),

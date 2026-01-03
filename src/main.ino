@@ -1144,7 +1144,16 @@ bool loadConfig() {
             Serial.println("ERROR: Middleware enabled but URL not provided");
             return false;
         }
+        
+        // Basic URL format validation: require http:// or https:// prefix
+        if (!(middleware_url.startsWith("http://") || middleware_url.startsWith("https://"))) {
+            Serial.println("ERROR: Middleware URL must start with \"http://\" or \"https://\"");
+            return false;
+        }
+        
         Serial.println("Config validated for middleware mode");
+        Serial.print("Middleware URL: ");
+        Serial.println(middleware_url);
     } else {
         // Direct API mode: validate required API keys
         if (owm_api_key.isEmpty() || city.isEmpty()) {
