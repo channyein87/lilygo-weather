@@ -16,32 +16,46 @@ def load_config():
     """Load API keys and configuration"""
     config_file = os.getenv('CONFIG_FILE', 'config.json')
     
+    # Prefer config file if it exists
     if os.path.exists(config_file):
         with open(config_file, 'r') as f:
-            return json.load(f)
-    
-    # Fallback to environment variables
-    return {
-        'weather': {
-            'api_key': os.getenv('OPENWEATHERMAP_API_KEY', ''),
-            'city': os.getenv('WEATHER_CITY', 'Sydney'),
-            'country': os.getenv('WEATHER_COUNTRY', 'AU'),
-            'units': os.getenv('WEATHER_UNITS', 'metric')
-        },
-        'crypto': {
-            'api_key': os.getenv('COINGECKO_API_KEY', ''),
-            'symbol': os.getenv('CRYPTO_SYMBOL', 'btc')
-        },
-        'stock': {
-            'api_key': os.getenv('MARKETSTACK_API_KEY', ''),
-            'symbol': os.getenv('STOCK_SYMBOL', 'AAPL')
-        },
-        'train': {
-            'api_key': os.getenv('TRANSPORTNSW_API_KEY', ''),
-            'origin': os.getenv('TRAIN_ORIGIN', ''),
-            'destination': os.getenv('TRAIN_DESTINATION', '')
+            config_data = json.load(f)
+    else:
+        # Fallback to environment variables
+        config_data = {
+            'weather': {
+                'api_key': os.getenv('OPENWEATHERMAP_API_KEY', ''),
+                'city': os.getenv('WEATHER_CITY', 'Sydney'),
+                'country': os.getenv('WEATHER_COUNTRY', 'AU'),
+                'units': os.getenv('WEATHER_UNITS', 'metric')
+            },
+            'crypto': {
+                'api_key': os.getenv('COINGECKO_API_KEY', ''),
+                'symbol': os.getenv('CRYPTO_SYMBOL', 'btc')
+            },
+            'stock': {
+                'api_key': os.getenv('MARKETSTACK_API_KEY', ''),
+                'symbol': os.getenv('STOCK_SYMBOL', 'AAPL')
+            },
+            'train': {
+                'api_key': os.getenv('TRANSPORTNSW_API_KEY', ''),
+                'origin': os.getenv('TRAIN_ORIGIN', ''),
+                'destination': os.getenv('TRAIN_DESTINATION', '')
+            }
         }
-    }
+    
+    # Validate that required configuration is present
+    weather_cfg = {}
+    if isinstance(config_data, dict):
+        weather_cfg = config_data.get('weather', {}) or {}
+    api_key = weather_cfg.get('api_key')
+    if not api_key:
+        raise RuntimeError(
+            "Weather API key not configured. "
+            "Set 'weather.api_key' in the config file or the OPENWEATHERMAP_API_KEY environment variable."
+        )
+    
+    return config_data
 
 config = load_config()
 
