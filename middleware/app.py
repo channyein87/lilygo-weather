@@ -3,12 +3,20 @@ LILYGO T5 Weather Display - Middleware API
 Aggregates data from multiple upstream APIs to optimize battery life on display board
 """
 
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 import requests
 import os
 import json
+import logging
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
@@ -87,13 +95,16 @@ def fetch_weather_data():
         units = weather_config.get('units', 'metric')
         
         if not api_key:
+            logger.warning("Weather API key not configured")
             return {'error': 'Weather API key not configured'}
         
+        logger.info(f"Fetching weather data for {city}, {country}")
         url = f"https://api.openweathermap.org/data/2.5/weather?q={city},{country}&appid={api_key}&units={units}"
         response = requests.get(url, timeout=10)
         response.raise_for_status()
         
         data = response.json()
+        logger.info(f"Weather data fetched successfully - {city}: {data['main']['temp']}°{units[0].upper()}")
         
         return {
             'temp': round(data['main']['temp'], 1),
@@ -109,13 +120,13 @@ def fetch_weather_data():
         }
     except requests.exceptions.HTTPError as e:
         status_code = e.response.status_code if e.response else 'unknown'
-        print(f"Error fetching weather data: HTTP {status_code} - {e}")
+        logger.error(f"HTTP error fetching weather data: {status_code} - {e}")
         return {'error': f'HTTP {status_code}: {str(e)}'}
     except requests.exceptions.RequestException as e:
-        print(f"Error fetching weather data: Network error - {e}")
+        logger.error(f"Network error fetching weather data: {e}")
         return {'error': f'Network error: {str(e)}'}
     except Exception as e:
-        print(f"Error fetching weather data: {e}")
+        logger.error(f"Error fetching weather data: {e}")
         return {'error': str(e)}
 
 def fetch_crypto_data():
@@ -126,6 +137,7 @@ def fetch_crypto_data():
         symbol = crypto_config.get('symbol', 'btc').lower()
         
         if not api_key:
+            logger.warning("Crypto API key not configured")
             return {'error': 'Crypto API key not configured'}
         
         # Map common symbols to CoinGecko IDs
@@ -147,6 +159,7 @@ def fetch_crypto_data():
         # Convert symbol to CoinGecko ID if it's a known symbol, otherwise use as-is
         coin_id = symbol_to_id.get(symbol, symbol)
         
+        logger.info(f"Fetching crypto data for {symbol.upper()} (ID: {coin_id})")
         url = f"https://api.coingecko.com/api/v3/simple/price?ids={coin_id}&vs_currencies=usd&include_24hr_change=true"
         headers = {'x-cg-demo-api-key': api_key}
         response = requests.get(url, headers=headers, timeout=10)
@@ -155,22 +168,26 @@ def fetch_crypto_data():
         data = response.json()
         
         if coin_id in data:
+            price = int(data[coin_id].get('usd', 0))
+            change = round(data[coin_id].get('usd_24h_change', 0), 2)
+            logger.info(f"Crypto data fetched successfully - {symbol.upper()}: ${price} ({change:+.2f}%)")
             return {
                 'symbol': symbol.upper(),
-                'price': int(data[coin_id].get('usd', 0)),
-                'change_24h': round(data[coin_id].get('usd_24h_change', 0), 2)
+                'price': price,
+                'change_24h': change
             }
         else:
+            logger.warning(f"Crypto symbol/ID not found: {symbol}")
             return {'error': f'Crypto symbol/ID not found: {symbol}'}
     except requests.exceptions.HTTPError as e:
         status_code = e.response.status_code if e.response else 'unknown'
-        print(f"Error fetching crypto data: HTTP {status_code} - {e}")
+        logger.error(f"HTTP error fetching crypto data: {status_code} - {e}")
         return {'error': f'HTTP {status_code}: {str(e)}'}
     except requests.exceptions.RequestException as e:
-        print(f"Error fetching crypto data: Network error - {e}")
+        logger.error(f"Network error fetching crypto data: {e}")
         return {'error': f'Network error: {str(e)}'}
     except Exception as e:
-        print(f"Error fetching crypto data: {e}")
+        logger.error(f"Error fetching crypto data: {e}")
         return {'error': str(e)}
 
 def fetch_stock_data():
@@ -181,8 +198,10 @@ def fetch_stock_data():
         symbol = stock_config.get('symbol', 'AAPL').upper()
         
         if not api_key:
+            logger.warning("Stock API key not configured")
             return {'error': 'Stock API key not configured'}
         
+        logger.info(f"Fetching stock data for {symbol}")
         url = f"http://api.marketstack.com/v1/eod/latest?access_key={api_key}&symbols={symbol}"
         response = requests.get(url, timeout=10)
         response.raise_for_status()
@@ -195,6 +214,7 @@ def fetch_stock_data():
             close_price = stock_data.get('close', 0)
             change = close_price - open_price
             
+            logger.info(f"Stock data fetched successfully - {symbol}: ${close_price:.2f} ({change:+.2f})")
             return {
                 'symbol': symbol,
                 'price': round(close_price, 2),
@@ -202,16 +222,17 @@ def fetch_stock_data():
                 'change': round(change, 2)
             }
         else:
+            logger.warning(f"Stock symbol not found: {symbol}")
             return {'error': 'Stock symbol not found'}
     except requests.exceptions.HTTPError as e:
         status_code = e.response.status_code if e.response else 'unknown'
-        print(f"Error fetching stock data: HTTP {status_code} - {e}")
+        logger.error(f"HTTP error fetching stock data: {status_code} - {e}")
         return {'error': f'HTTP {status_code}: {str(e)}'}
     except requests.exceptions.RequestException as e:
-        print(f"Error fetching stock data: Network error - {e}")
+        logger.error(f"Network error fetching stock data: {e}")
         return {'error': f'Network error: {str(e)}'}
     except Exception as e:
-        print(f"Error fetching stock data: {e}")
+        logger.error(f"Error fetching stock data: {e}")
         return {'error': str(e)}
 
 def fetch_train_data():
@@ -223,8 +244,10 @@ def fetch_train_data():
         destination = train_config.get('destination')
         
         if not api_key or not origin or not destination:
+            logger.warning("Train API not fully configured")
             return {'error': 'Train API not fully configured'}
         
+        logger.info(f"Fetching train data from {origin} to {destination}")
         url = f"https://api.transport.nsw.gov.au/v1/tp/trip"
         params = {
             'outputFormat': 'rapidJSON',
@@ -261,21 +284,23 @@ def fetch_train_data():
                 departure_time_utc = leg['origin'].get('departureTimeEstimated', '')
                 via_destination = leg['transportation']['destination'].get('name', '')
                 
+                logger.info(f"Train data fetched successfully - Next departure at {departure_time_utc}")
                 return {
                     'departure_time': departure_time_utc,
                     'via': via_destination
                 }
         
+        logger.warning("No train data available")
         return {'error': 'No train data available'}
     except requests.exceptions.HTTPError as e:
         status_code = e.response.status_code if e.response else 'unknown'
-        print(f"Error fetching train data: HTTP {status_code} - {e}")
+        logger.error(f"HTTP error fetching train data: {status_code} - {e}")
         return {'error': f'HTTP {status_code}: {str(e)}'}
     except requests.exceptions.RequestException as e:
-        print(f"Error fetching train data: Network error - {e}")
+        logger.error(f"Network error fetching train data: {e}")
         return {'error': f'Network error: {str(e)}'}
     except Exception as e:
-        print(f"Error fetching train data: {e}")
+        logger.error(f"Error fetching train data: {e}")
         return {'error': str(e)}
 
 @app.route('/health', methods=['GET'])
@@ -299,6 +324,11 @@ def get_aggregated_data():
     when fetching the aggregated data.
     """
     try:
+        # Log incoming request
+        client_ip = request.remote_addr
+        method = request.method
+        logger.info(f"Received {method} request from {client_ip} for aggregated data")
+        
         # Fetch all data in parallel for better performance
         with ThreadPoolExecutor(max_workers=4) as executor:
             weather_future = executor.submit(fetch_weather_data)
@@ -320,8 +350,10 @@ def get_aggregated_data():
             'train': train
         }
         
+        logger.info(f"Successfully aggregated data for {client_ip}")
         return jsonify(response)
     except Exception as e:
+        logger.error(f"Error aggregating data: {e}")
         return jsonify({
             'error': str(e),
             'timestamp': datetime.utcnow().isoformat()
@@ -330,21 +362,25 @@ def get_aggregated_data():
 @app.route('/api/weather', methods=['GET'])
 def get_weather():
     """Endpoint for weather data only"""
+    logger.info(f"Received request from {request.remote_addr} for weather data")
     return jsonify(fetch_weather_data())
 
 @app.route('/api/crypto', methods=['GET'])
 def get_crypto():
     """Endpoint for crypto data only"""
+    logger.info(f"Received request from {request.remote_addr} for crypto data")
     return jsonify(fetch_crypto_data())
 
 @app.route('/api/stock', methods=['GET'])
 def get_stock():
     """Endpoint for stock data only"""
+    logger.info(f"Received request from {request.remote_addr} for stock data")
     return jsonify(fetch_stock_data())
 
 @app.route('/api/train', methods=['GET'])
 def get_train():
     """Endpoint for train data only"""
+    logger.info(f"Received request from {request.remote_addr} for train data")
     return jsonify(fetch_train_data())
 
 if __name__ == '__main__':
@@ -353,5 +389,5 @@ if __name__ == '__main__':
     host = os.getenv('HOST', '0.0.0.0')
     debug = os.getenv('DEBUG', 'False').lower() == 'true'
     
-    print(f"Starting middleware server on {host}:{port}")
+    logger.info(f"Starting middleware server on {host}:{port}")
     app.run(host=host, port=port, debug=debug)

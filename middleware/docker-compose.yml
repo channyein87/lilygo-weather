@@ -1,5 +1,3 @@
-version: '3.8'
-
 # SECURITY NOTICE:
 # This middleware is designed for LOCAL NETWORK use only.
 # Best practices for deployment:
