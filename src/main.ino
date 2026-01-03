@@ -329,6 +329,48 @@ void connectToWiFi() {
     }
 }
 
+// Helper function to parse UTC ISO 8601 timestamp and convert to local time string
+String parseUTCToLocal(const String& utc_timestamp) {
+    if (utc_timestamp.length() < 19) {
+        return "--:--";
+    }
+    
+    int year = atoi(utc_timestamp.substring(0, 4).c_str());
+    int month = atoi(utc_timestamp.substring(5, 7).c_str());
+    int day = atoi(utc_timestamp.substring(8, 10).c_str());
+    int hour = atoi(utc_timestamp.substring(11, 13).c_str());
+    int minute = atoi(utc_timestamp.substring(14, 16).c_str());
+    int second = atoi(utc_timestamp.substring(17, 19).c_str());
+    
+    struct tm timeinfo = {};
+    timeinfo.tm_year = year - 1900;
+    timeinfo.tm_mon = month - 1;
+    timeinfo.tm_mday = day;
+    timeinfo.tm_hour = hour;
+    timeinfo.tm_min = minute;
+    timeinfo.tm_sec = second;
+    timeinfo.tm_isdst = 0;
+    
+    // Use setenv to temporarily set timezone to UTC for mktime
+    setenv("TZ", "UTC", 1);
+    tzset();
+    time_t utc_time = mktime(&timeinfo);
+    
+    // Convert to local timezone using Timezone library
+    TimeChangeRule *tcr;
+    time_t local_time = ausET.toLocal(utc_time, &tcr);
+    struct tm *local_timeinfo = localtime(&local_time);
+    
+    // Format as HH:MMAM/PM
+    char time_buffer[20];
+    int hour_12 = local_timeinfo->tm_hour % 12;
+    if (hour_12 == 0) hour_12 = 12;
+    const char *am_pm = local_timeinfo->tm_hour >= 12 ? "PM" : "AM";
+    snprintf(time_buffer, sizeof(time_buffer), "%02d:%02d%s", hour_12, local_timeinfo->tm_min, am_pm);
+    
+    return String(time_buffer);
+}
+
 void fetchMiddlewareData() {
     if (WiFi.status() != WL_CONNECTED) {
         Serial.println("WiFi not connected, skipping middleware update");
@@ -342,10 +384,9 @@ void fetchMiddlewareData() {
     
     HTTPClient http;
     http.begin(middleware_url);
-    http.addHeader("Content-Type", "application/json");
     
-    // Use POST method for middleware
-    int httpCode = http.POST("");
+    // Use GET method for middleware (RESTful data retrieval)
+    int httpCode = http.GET();
     
     if (httpCode == 200) {
         String payload = http.getString();
@@ -438,41 +479,7 @@ void fetchMiddlewareData() {
                 train_via = via_dest;
                 
                 // Parse ISO 8601 datetime string and convert to local time
-                if (String(dep_time_utc).length() > 0) {
-                    int year = atoi(String(dep_time_utc).substring(0, 4).c_str());
-                    int month = atoi(String(dep_time_utc).substring(5, 7).c_str());
-                    int day = atoi(String(dep_time_utc).substring(8, 10).c_str());
-                    int hour = atoi(String(dep_time_utc).substring(11, 13).c_str());
-                    int minute = atoi(String(dep_time_utc).substring(14, 16).c_str());
-                    int second = atoi(String(dep_time_utc).substring(17, 19).c_str());
-                    
-                    struct tm timeinfo = {};
-                    timeinfo.tm_year = year - 1900;
-                    timeinfo.tm_mon = month - 1;
-                    timeinfo.tm_mday = day;
-                    timeinfo.tm_hour = hour;
-                    timeinfo.tm_min = minute;
-                    timeinfo.tm_sec = second;
-                    timeinfo.tm_isdst = 0;
-                    
-                    // Use setenv to temporarily set timezone to UTC for mktime
-                    setenv("TZ", "UTC", 1);
-                    tzset();
-                    time_t utc_time = mktime(&timeinfo);
-                    
-                    // Convert to local timezone using Timezone library
-                    TimeChangeRule *tcr;
-                    time_t local_time = ausET.toLocal(utc_time, &tcr);
-                    struct tm *local_timeinfo = localtime(&local_time);
-                    
-                    char time_buffer[20];
-                    int hour_12 = local_timeinfo->tm_hour % 12;
-                    if (hour_12 == 0) hour_12 = 12;
-                    const char *am_pm = local_timeinfo->tm_hour >= 12 ? "PM" : "AM";
-                    snprintf(time_buffer, sizeof(time_buffer), "%02d:%02d%s", hour_12, local_timeinfo->tm_min, am_pm);
-                    
-                    train_departure_time = time_buffer;
-                }
+                train_departure_time = parseUTCToLocal(dep_time_utc);
                 
                 Serial.println("Train data parsed from middleware");
             } else {
@@ -688,47 +695,8 @@ void fetchTrainData() {
             Serial.print("Departure time UTC: ");
             Serial.println(dep_time_utc);
             
-            // Parse ISO 8601 datetime string and convert to ausET time
-            // Format: "2026-01-01T11:05:30Z"
-            if (String(dep_time_utc).length() > 0) {
-                // Parse the ISO string manually
-                int year = atoi(String(dep_time_utc).substring(0, 4).c_str());
-                int month = atoi(String(dep_time_utc).substring(5, 7).c_str());
-                int day = atoi(String(dep_time_utc).substring(8, 10).c_str());
-                int hour = atoi(String(dep_time_utc).substring(11, 13).c_str());
-                int minute = atoi(String(dep_time_utc).substring(14, 16).c_str());
-                int second = atoi(String(dep_time_utc).substring(17, 19).c_str());
-                
-                // Create time_t from parsed values (assuming UTC)
-                struct tm timeinfo = {};
-                timeinfo.tm_year = year - 1900;
-                timeinfo.tm_mon = month - 1;
-                timeinfo.tm_mday = day;
-                timeinfo.tm_hour = hour;
-                timeinfo.tm_min = minute;
-                timeinfo.tm_sec = second;
-                timeinfo.tm_isdst = 0;  // UTC has no DST
-                
-                // Use setenv to temporarily set timezone to UTC for mktime
-                setenv("TZ", "UTC", 1);
-                tzset();
-                time_t utc_time = mktime(&timeinfo);
-                
-                // Convert to ausET timezone
-                TimeChangeRule *tcr;
-                time_t local_time = ausET.toLocal(utc_time, &tcr);
-                
-                struct tm *local_timeinfo = localtime(&local_time);
-                
-                // Format as HH:MMAM/PM
-                char time_buffer[20];
-                int hour_12 = local_timeinfo->tm_hour % 12;
-                if (hour_12 == 0) hour_12 = 12;
-                const char *am_pm = local_timeinfo->tm_hour >= 12 ? "PM" : "AM";
-                snprintf(time_buffer, sizeof(time_buffer), "%02d:%02d%s", hour_12, local_timeinfo->tm_min, am_pm);
-                
-                train_departure_time = time_buffer;
-            }
+            // Parse ISO 8601 datetime string and convert to local time
+            train_departure_time = parseUTCToLocal(dep_time_utc);
             
             Serial.print("Train departure time: ");
             Serial.println(train_departure_time);
