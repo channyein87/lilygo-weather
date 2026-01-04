@@ -88,6 +88,12 @@ String sleep_time = "";
 String wakeup_time = "";
 bool sleep_schedule_enabled = false;
 
+// Cached parsed sleep schedule times (to avoid redundant parsing)
+int sleep_hour_cached = 0;
+int sleep_minute_cached = 0;
+int wakeup_hour_cached = 0;
+int wakeup_minute_cached = 0;
+
 // Display dimensions
 #define EPD_DISPLAY_WIDTH 960
 #define EPD_DISPLAY_HEIGHT 540
@@ -273,8 +279,9 @@ void loop() {
     // Check if we're in sleep period
     if (isInSleepPeriod()) {
         Serial.println("Display is in sleep period. Skipping update.");
-        // Use longer delay during sleep to save even more power
-        delay(60000);  // Check every minute during sleep
+        // Use 30-second delay during sleep - balances power savings with wakeup responsiveness
+        // Checking every 30s means max 30s delay before waking up, while still saving significant power
+        delay(30000);
         return;
     }
     
@@ -1106,14 +1113,9 @@ bool isInSleepPeriod() {
         return false;
     }
     
-    // Parse sleep and wakeup times
-    int sleep_hour, sleep_minute, wakeup_hour, wakeup_minute;
-    if (!parseTime(sleep_time, sleep_hour, sleep_minute) || 
-        !parseTime(wakeup_time, wakeup_hour, wakeup_minute)) {
-        Serial.println("Invalid sleep/wakeup time format, disabling sleep schedule");
-        sleep_schedule_enabled = false;
-        return false;
-    }
+    // Use cached parsed times (parsed once during loadConfig)
+    int sleep_minutes = sleep_hour_cached * 60 + sleep_minute_cached;
+    int wakeup_minutes = wakeup_hour_cached * 60 + wakeup_minute_cached;
     
     // Get current local time
     time_t utc = time(nullptr);
@@ -1123,10 +1125,6 @@ bool isInSleepPeriod() {
     
     int current_hour = timeinfo->tm_hour;
     int current_minute = timeinfo->tm_min;
-    
-    // Convert times to minutes since midnight for easier comparison
-    int sleep_minutes = sleep_hour * 60 + sleep_minute;
-    int wakeup_minutes = wakeup_hour * 60 + wakeup_minute;
     int current_minutes = current_hour * 60 + current_minute;
     
     // Check if sleep period spans midnight
@@ -1141,7 +1139,7 @@ bool isInSleepPeriod() {
         is_sleeping = (current_minutes >= sleep_minutes && current_minutes < wakeup_minutes);
     }
     
-    // Log sleep status only when it changes or during sleep period
+    // Log sleep status only during sleep period to reduce output
     if (is_sleeping) {
         char time_buffer[20];
         snprintf(time_buffer, sizeof(time_buffer), "%02d:%02d", current_hour, current_minute);
@@ -1243,18 +1241,30 @@ bool loadConfig() {
         // Enable sleep schedule only if both sleep and wakeup times are provided
         if (!sleep_time.isEmpty() && !wakeup_time.isEmpty()) {
             // Validate time format for both sleep and wakeup times
-            // Note: hour/minute values are only used for validation and are discarded
             int sleep_hour, sleep_minute, wakeup_hour, wakeup_minute;
             bool sleep_valid = parseTime(sleep_time, sleep_hour, sleep_minute);
             bool wakeup_valid = parseTime(wakeup_time, wakeup_hour, wakeup_minute);
             
             if (sleep_valid && wakeup_valid) {
-                sleep_schedule_enabled = true;
-                Serial.println("Sleep schedule enabled");
-                Serial.print("Sleep time: ");
-                Serial.println(sleep_time);
-                Serial.print("Wakeup time: ");
-                Serial.println(wakeup_time);
+                // Check for invalid configuration: sleep and wakeup times are identical
+                if (sleep_hour == wakeup_hour && sleep_minute == wakeup_minute) {
+                    Serial.println("WARNING: Sleep and wakeup times are identical. Schedule disabled.");
+                    Serial.println("Sleep and wakeup times must be different.");
+                    sleep_schedule_enabled = false;
+                } else {
+                    // Cache parsed values to avoid redundant parsing in isInSleepPeriod()
+                    sleep_hour_cached = sleep_hour;
+                    sleep_minute_cached = sleep_minute;
+                    wakeup_hour_cached = wakeup_hour;
+                    wakeup_minute_cached = wakeup_minute;
+                    
+                    sleep_schedule_enabled = true;
+                    Serial.println("Sleep schedule enabled");
+                    Serial.print("Sleep time: ");
+                    Serial.println(sleep_time);
+                    Serial.print("Wakeup time: ");
+                    Serial.println(wakeup_time);
+                }
             } else {
                 Serial.println("WARNING: Invalid sleep/wakeup time format. Schedule disabled.");
                 Serial.println("Expected format: HH:MM (24-hour format, e.g., \"23:00\", \"06:00\")");
