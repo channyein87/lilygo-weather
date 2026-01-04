@@ -1,0 +1,41 @@
+{
+  "_comment": "Example configuration with sleep schedule enabled - Copy to config.json and customize",
+  "wifi": {
+    "ssid": "MyHomeWiFi",
+    "password": "MySecurePassword123"
+  },
+  "middleware": {
+    "_comment": "Optional: Enable middleware mode for better battery life",
+    "enabled": false,
+    "url": ""
+  },
+  "weather": {
+    "api_key": "abc123def456ghi789jkl012mno345pqr678stu901vwx234yz567890abcde12",
+    "city": "Sydney",
+    "country": "AU",
+    "units": "metric"
+  },
+  "ntp": {
+    "server": "au.pool.ntp.org",
+    "timezone": "Australia/Sydney"
+  },
+  "crypto": {
+    "api_key": "CG-abc123def456ghi789",
+    "symbol": "btc"
+  },
+  "stock": {
+    "api_key": "xyz789abc123def456",
+    "symbol": "AAPL"
+  },
+  "train": {
+    "api_key": "train123key456",
+    "origin": "10101100",
+    "destination": "10101331"
+  },
+  "update_interval_minutes": 5,
+  "schedule": {
+    "_comment": "Sleep from 11 PM to 6 AM daily to save battery",
+    "sleep": "23:00",
+    "wakeup": "06:00"
+  }
+}

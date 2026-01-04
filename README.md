@@ -76,11 +76,15 @@ cp data/config.template.json data/config.json
     "origin": "10101100",
     "destination": "10101331"
   },
-  "update_interval_minutes": 5
+  "update_interval_minutes": 5,
+  "schedule": {
+    "sleep": "23:00",
+    "wakeup": "06:00"
+  }
 }
 ```
 
-**Note:** All API keys except OpenWeatherMap are optional. If you don't provide keys for crypto, stock, or train APIs, those sections will show placeholder values.
+**Note:** All API keys except OpenWeatherMap are optional. If you don't provide keys for crypto, stock, or train APIs, those sections will show placeholder values. The sleep schedule is also optional - leave it empty to disable.
 
 #### 3. Build & Upload (3 minutes)
 ```bash
@@ -155,7 +159,8 @@ pio run -t uploadfs && pio run -t upload
 ✅ **Train Schedules** - Next departure times for Sydney trains (Transport NSW)  
 ✅ **Automatic Time Sync** - NTP-based time synchronization with timezone support  
 ✅ **Automatic Updates** - Configurable update interval (1-60 minutes)  
-✅ **Low Power** - 5-10 day battery life with middleware, 3-5 days direct mode
+✅ **Sleep Schedule** - Optional power-saving mode to pause updates during specified hours  
+✅ **Low Power** - 5-10 day battery life with middleware, 3-5 days direct mode  
 ✅ **Middleware Support** - Optional local API aggregation for better battery life  
 ✅ **WiFi Ready** - Auto-reconnection with error handling  
 ✅ **Configuration Storage** - All credentials stored in LittleFS, no firmware edits needed  

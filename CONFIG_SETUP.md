@@ -66,7 +66,11 @@ Open `data/config.json` in your editor and fill in your actual values:
     "origin": "10101100",
     "destination": "10101331"
   },
-  "update_interval_minutes": 5
+  "update_interval_minutes": 5,
+  "schedule": {
+    "sleep": "23:00",
+    "wakeup": "06:00"
+  }
 }
 ```
 
@@ -75,6 +79,7 @@ Open `data/config.json` in your editor and fill in your actual values:
 - OpenWeatherMap API key is required (64 characters) in direct mode
 - NTP server and timezone are required for accurate time display
 - CoinGecko, MarketStack, and Transport NSW APIs are optional
+- Sleep schedule is optional (leave empty to disable)
 - City name should be in English (e.g., "Sydney" not "Sídney")
 - Country code must be 2-letter ISO 3166 code
 
@@ -320,6 +325,45 @@ Watch the serial output for:
 | Key | Type | Example | Notes |
 |-----|------|---------|-------|
 | `update_interval_minutes` | Number | 5 | How often to fetch data (1-60 minutes) |
+
+### Sleep Schedule Settings (Optional)
+| Key | Type | Example | Notes |
+|-----|------|---------|-------|
+| `schedule.sleep` | String | "23:00" | Time to enter sleep mode (24-hour format HH:MM) |
+| `schedule.wakeup` | String | "06:00" | Time to resume normal operation (24-hour format HH:MM) |
+
+**Sleep Schedule Feature:**
+- **Optional power-saving feature** that pauses display updates during specified hours
+- Leave both fields empty or omit the `schedule` section to disable
+- Both `sleep` and `wakeup` times must be provided to enable the schedule
+- Times must be in 24-hour format: `HH:MM` (e.g., `"23:00"`, `"06:00"`)
+- Supports sleep periods that span midnight (e.g., sleep at 23:00, wake at 06:00)
+- During sleep period:
+  - Display stops fetching data and updating
+  - Device enters low-power state with longer check intervals
+  - Extends battery life significantly for overnight periods
+- At wakeup time, display automatically resumes normal operation
+
+**Example configurations:**
+```json
+// Sleep overnight from 11 PM to 6 AM
+"schedule": {
+  "sleep": "23:00",
+  "wakeup": "06:00"
+}
+
+// Sleep early morning from 1 AM to 5 AM
+"schedule": {
+  "sleep": "01:00",
+  "wakeup": "05:00"
+}
+
+// Disabled (no sleep schedule)
+"schedule": {
+  "sleep": "",
+  "wakeup": ""
+}
+```
 
 ## Important Notes
 - **DO NOT** commit `config.json` to git - it's listed in `.gitignore`

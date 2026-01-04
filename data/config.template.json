@@ -32,5 +32,10 @@
     "origin": "ORIGIN_STATION_ID",
     "destination": "DESTINATION_STATION_ID"
   },
-  "update_interval_minutes": 5
+  "update_interval_minutes": 5,
+  "schedule": {
+    "_comment": "Optional power-saving schedule: Set sleep and wakeup times in 24-hour format (HH:MM) to automatically pause display updates during specified hours. Leave empty or omit to disable sleep schedule. Example: sleep at 23:00 (11 PM), wake at 06:00 (6 AM).",
+    "sleep": "",
+    "wakeup": ""
+  }
 }
