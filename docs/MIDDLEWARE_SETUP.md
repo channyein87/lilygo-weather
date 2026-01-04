@@ -60,7 +60,7 @@ Edit `config/config.json` with your API keys:
   "weather": {
     "api_key": "YOUR_GOOGLE_MAPS_API_KEY",
     "city": "Sydney",
-    "country": "AU",
+    "country": "Australia",
     "units": "metric"
   },
   "crypto": {
@@ -196,7 +196,7 @@ Create `config/config.json` with your settings:
   "weather": {
     "api_key": "...",
     "city": "Sydney",
-    "country": "AU",
+    "country": "Australia",
     "units": "metric"
   },
   ...

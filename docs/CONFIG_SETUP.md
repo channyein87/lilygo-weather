@@ -46,7 +46,7 @@ Open `data/config.json` in your editor and fill in your actual values:
   "weather": {
     "api_key": "YOUR_GOOGLE_MAPS_API_KEY",
     "city": "Sydney",
-    "country": "AU",
+    "country": "Australia",
     "units": "metric"
   },
   "ntp": {
@@ -81,7 +81,7 @@ Open `data/config.json` in your editor and fill in your actual values:
 - CoinGecko, MarketStack, and Transport NSW APIs are optional
 - Sleep schedule is optional (leave empty to disable)
 - City name should be in English (e.g., "Sydney" not "Sídney")
-- Country code must be 2-letter ISO 3166 code
+- Country name should be the full country name (e.g., "Australia", "France")
 
 ### 3. Get API Keys
 
@@ -166,7 +166,7 @@ Edit `data/config.json` with minimal settings:
   "weather": {
     "api_key": "",
     "city": "Sydney",
-    "country": "AU",
+    "country": "Australia",
     "units": "metric"
   },
   "crypto": {
@@ -261,7 +261,7 @@ Watch the serial output for:
 |-----|------|---------|-------|
 | `weather.api_key` | String | "abc123...xyz" | From openweathermap.org (64 chars, not required in middleware mode) |
 | `weather.city` | String | "Sydney" | City name in English |
-| `weather.country` | String | "AU" | ISO 3166 country code (2 letters) |
+| `weather.country` | String | "Australia" | Full country name (e.g., "Australia", "France") |
 | `weather.units` | String | "metric" | "metric" (°C) or "imperial" (°F) |
 
 ### NTP Time Settings (Required)
