@@ -1129,25 +1129,32 @@ bool isInSleepPeriod() {
     int wakeup_minutes = wakeup_hour * 60 + wakeup_minute;
     int current_minutes = current_hour * 60 + current_minute;
     
-    Serial.print("Sleep check - Current: ");
-    Serial.print(current_hour);
-    Serial.print(":");
-    Serial.print(current_minute);
-    Serial.print(", Sleep: ");
-    Serial.print(sleep_time);
-    Serial.print(", Wakeup: ");
-    Serial.println(wakeup_time);
-    
     // Check if sleep period spans midnight
+    bool is_sleeping;
     if (sleep_minutes > wakeup_minutes) {
         // Sleep period spans midnight (e.g., 23:00 to 06:00)
         // We're asleep if current time is >= sleep OR < wakeup
-        return (current_minutes >= sleep_minutes || current_minutes < wakeup_minutes);
+        is_sleeping = (current_minutes >= sleep_minutes || current_minutes < wakeup_minutes);
     } else {
         // Sleep period is within same day (e.g., 01:00 to 05:00)
         // We're asleep if current time is >= sleep AND < wakeup
-        return (current_minutes >= sleep_minutes && current_minutes < wakeup_minutes);
+        is_sleeping = (current_minutes >= sleep_minutes && current_minutes < wakeup_minutes);
     }
+    
+    // Log sleep status only when it changes or during sleep period
+    if (is_sleeping) {
+        char time_buffer[20];
+        snprintf(time_buffer, sizeof(time_buffer), "%02d:%02d", current_hour, current_minute);
+        Serial.print("Sleep check - Current: ");
+        Serial.print(time_buffer);
+        Serial.print(", Sleep: ");
+        Serial.print(sleep_time);
+        Serial.print(", Wakeup: ");
+        Serial.print(wakeup_time);
+        Serial.println(" [SLEEPING]");
+    }
+    
+    return is_sleeping;
 }
 
 bool loadConfig() {
@@ -1236,6 +1243,7 @@ bool loadConfig() {
         // Enable sleep schedule only if both sleep and wakeup times are provided
         if (!sleep_time.isEmpty() && !wakeup_time.isEmpty()) {
             // Validate time format for both sleep and wakeup times
+            // Note: hour/minute values are only used for validation and are discarded
             int sleep_hour, sleep_minute, wakeup_hour, wakeup_minute;
             bool sleep_valid = parseTime(sleep_time, sleep_hour, sleep_minute);
             bool wakeup_valid = parseTime(wakeup_time, wakeup_hour, wakeup_minute);
