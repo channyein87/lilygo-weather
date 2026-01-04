@@ -372,7 +372,7 @@ Watch the serial output for:
 - Keep `config.template.json` in the repo as a reference
 - **Always upload filesystem first** with `pio run -t uploadfs` before uploading firmware
 - Configuration persists on the device - you only need to re-upload if you change settings
-- Only OpenWeatherMap and NTP settings are required
+- Only Google Weather (Google Maps Platform) and NTP settings are required
 - Optional APIs will show placeholder values if not configured
 
 ## Troubleshooting
@@ -388,7 +388,7 @@ Watch the serial output for:
 - Check serial output: `pio device monitor -b 115200`
 
 ### "API Error" or "Timeout"
-- **Weather API:** Verify OpenWeatherMap API key is complete (64 characters, no spaces)
+- **Weather API:** Verify Google Maps Platform API key is complete (no spaces) and has Weather API access enabled
 - **Crypto API:** Check CoinGecko API key format (starts with "CG-")
 - **Stock API:** Verify MarketStack API key, check free tier limits (100/month)
 - **Train API:** Check Transport NSW API key, verify station IDs are correct
@@ -417,10 +417,9 @@ No firmware recompilation needed!
 - **60 minutes**: Maximum supported
 
 ### Free Tier Limits
-- **OpenWeatherMap**: 1000 calls/day (≈every 1.5 minutes if used constantly)
+- **Google Weather (Maps Platform)**: Subject to Google Maps Platform quotas (see Google Cloud console)
 - **CoinGecko**: 10,000 calls/month (≈every 4 minutes if used constantly)
 - **MarketStack**: 100 calls/month (≈3 times per day max)
 - **Transport NSW**: Generous limits, safe for frequent updates
 
 **Recommendation:** Use 5-10 minute updates. MarketStack is the limiting factor - check stock data only during market hours or use longer intervals.
-
