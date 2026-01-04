@@ -64,7 +64,7 @@ Edit `config/config.json`:
 ```json
 {
   "weather": {
-    "api_key": "YOUR_OPENWEATHERMAP_API_KEY",
+    "api_key": "YOUR_GOOGLE_MAPS_API_KEY",
     "city": "Sydney",
     "country": "AU",
     "units": "metric"
@@ -85,7 +85,7 @@ Edit `config/config.json`:
 }
 ```
 
-Only the weather API key is required. Others are optional.
+Only the Google Maps API key (for weather) is required. Others are optional.
 
 ## Deployment
 

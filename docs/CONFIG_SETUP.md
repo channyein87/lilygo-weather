@@ -12,7 +12,7 @@ The display board directly calls each API service (weather, crypto, stock, train
 The display board makes a single request to a local middleware service that aggregates data from all upstream APIs. This significantly improves battery life (2-3x improvement).
 
 The display supports multiple data sources:
-- **Weather** (OpenWeatherMap) - Required in direct mode
+- **Weather** (Google Weather API) - Required in direct mode
 - **Cryptocurrency** (CoinGecko) - Optional
 - **Stock Market** (MarketStack) - Optional
 - **Train Schedules** (Transport NSW) - Optional, Sydney area only
@@ -44,7 +44,7 @@ Open `data/config.json` in your editor and fill in your actual values:
     "url": ""
   },
   "weather": {
-    "api_key": "YOUR_OPENWEATHERMAP_API_KEY",
+    "api_key": "YOUR_GOOGLE_MAPS_API_KEY",
     "city": "Sydney",
     "country": "AU",
     "units": "metric"
@@ -76,7 +76,7 @@ Open `data/config.json` in your editor and fill in your actual values:
 
 **Important:**
 - WiFi SSID and password are case-sensitive
-- OpenWeatherMap API key is required (64 characters) in direct mode
+- Google Maps API key is required in direct mode
 - NTP server and timezone are required for accurate time display
 - CoinGecko, MarketStack, and Transport NSW APIs are optional
 - Sleep schedule is optional (leave empty to disable)
@@ -85,12 +85,14 @@ Open `data/config.json` in your editor and fill in your actual values:
 
 ### 3. Get API Keys
 
-#### OpenWeatherMap (Required)
-- Visit [openweathermap.org](https://openweathermap.org)
-- Click "Sign Up" or "Log In"
-- Go to your account → API Keys section
-- Copy your API key (should be 64 characters)
+#### Google Maps Platform (Required)
+- Visit [Google Cloud Console](https://console.cloud.google.com/apis)
+- Create a new project or select an existing one
+- Enable the **Geocoding API** and **Weather API**
+- Go to **Credentials** → **Create Credentials** → **API Key**
+- Copy your API key (format: "AIzaSy...")
 - Paste it into `config.json` in the `weather.api_key` field
+- **Note:** Free tier includes 28,500 API calls per month
 
 #### CoinGecko (Optional)
 - Visit [coingecko.com](https://www.coingecko.com/en/api)

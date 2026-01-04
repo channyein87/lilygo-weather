@@ -2,7 +2,7 @@
 
 ## Overview
 
-The middleware service is a lightweight Python Flask API that aggregates data from multiple upstream services (OpenWeatherMap, CoinGecko, MarketStack, Transport NSW) into a single endpoint. This architecture significantly improves battery life on the LILYGO T5 display board by:
+The middleware service is a lightweight Python Flask API that aggregates data from multiple upstream services (Google Weather API, CoinGecko, MarketStack, Transport NSW) into a single endpoint. This architecture significantly improves battery life on the LILYGO T5 display board by:
 
 1. **Reducing API calls**: Display board makes 1 request instead of 4+ requests
 2. **Offloading processing**: Heavy JSON parsing and data processing happens on the middleware
@@ -28,8 +28,8 @@ The middleware service is a lightweight Python Flask API that aggregates data fr
         │                │                │              │
         ▼                ▼                ▼              ▼
 ┌──────────────┐ ┌──────────────┐ ┌─────────────┐ ┌──────────────┐
-│ OpenWeather  │ │  CoinGecko   │ │ MarketStack │ │ Transport NSW│
-│     Map      │ │     API      │ │     API     │ │     API      │
+│ Google       │ │  CoinGecko   │ │ MarketStack │ │ Transport NSW│
+│ Weather API  │ │     API      │ │     API     │ │     API      │
 └──────────────┘ └──────────────┘ └─────────────┘ └──────────────┘
 ```
 
@@ -39,7 +39,7 @@ The middleware service is a lightweight Python Flask API that aggregates data fr
 
 - Docker and Docker Compose installed
 - Raspberry Pi or any Linux machine on the same WiFi network as the display board
-- API keys for the services you want to use (at minimum OpenWeatherMap)
+- API keys for the services you want to use (at minimum Google Maps Platform for weather)
 
 ### Installation Steps
 
@@ -58,7 +58,7 @@ Edit `config/config.json` with your API keys:
 ```json
 {
   "weather": {
-    "api_key": "YOUR_OPENWEATHERMAP_API_KEY",
+    "api_key": "YOUR_GOOGLE_MAPS_API_KEY",
     "city": "Sydney",
     "country": "AU",
     "units": "metric"
@@ -79,7 +79,7 @@ Edit `config/config.json` with your API keys:
 }
 ```
 
-**Note**: Only the weather API key is required. Other services are optional.
+**Note**: Only the Google Maps API key (for weather) is required. Other services are optional.
 
 #### 3. Build and Start the Container
 

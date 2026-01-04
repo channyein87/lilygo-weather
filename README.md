@@ -11,7 +11,7 @@ This project supports two modes of operation:
 - Middleware aggregates data from all upstream APIs
 - **2-3x longer battery life** (7-10 days vs 3-5 days)
 - Requires a Raspberry Pi or Linux machine on the same network
-- See [Middleware Setup Guide](middleware/MIDDLEWARE_SETUP.md)
+- See [Middleware Setup Guide](docs/MIDDLEWARE_SETUP.md)
 
 ### 📡 Direct API Mode (Default)
 - Display board directly calls each API (weather, crypto, stock, train)
@@ -28,7 +28,7 @@ This project supports two modes of operation:
 #### 1. Get API Keys (5 minutes)
 
 **Required:**
-- **OpenWeatherMap** (weather data): https://openweathermap.org/api - Free tier: 1000 calls/day
+- **Google Maps Platform** (weather data): https://console.cloud.google.com/apis - Free tier: 28,500 calls/month
 
 **Optional (for additional features):**
 - **CoinGecko** (cryptocurrency prices): https://www.coingecko.com/en/api - Free tier: 30 calls/minute
@@ -54,7 +54,7 @@ cp data/config.template.json data/config.json
     "url": ""
   },
   "weather": {
-    "api_key": "YOUR_OPENWEATHERMAP_API_KEY",
+    "api_key": "YOUR_GOOGLE_MAPS_API_KEY",
     "city": "Sydney",
     "country": "AU",
     "units": "metric"
@@ -84,7 +84,7 @@ cp data/config.template.json data/config.json
 }
 ```
 
-**Note:** All API keys except OpenWeatherMap are optional. If you don't provide keys for crypto, stock, or train APIs, those sections will show placeholder values. The sleep schedule is also optional - leave it empty to disable.
+**Note:** All API keys except Google Maps are optional. If you don't provide keys for crypto, stock, or train APIs, those sections will show placeholder values. The sleep schedule is also optional - leave it empty to disable.
 
 #### 3. Build & Upload (3 minutes)
 ```bash
@@ -106,7 +106,7 @@ pio device monitor -b 115200
 
 #### 1. Deploy Middleware
 
-Follow the [Middleware Setup Guide](middleware/MIDDLEWARE_SETUP.md) to deploy the middleware service on a Raspberry Pi or Linux machine.
+Follow the [Middleware Setup Guide](docs/MIDDLEWARE_SETUP.md) to deploy the middleware service on a Raspberry Pi or Linux machine.
 
 Quick steps:
 ```bash
@@ -153,7 +153,7 @@ pio run -t uploadfs && pio run -t upload
 
 ## Features
 
-✅ **Real-time Weather** - Temperature, conditions, humidity, wind speed (OpenWeatherMap)  
+✅ **Real-time Weather** - Temperature, conditions, precipitation probability, wind speed (Google Weather API)  
 ✅ **Cryptocurrency Prices** - Live crypto prices with 24h change (CoinGecko)  
 ✅ **Stock Market Data** - Real-time stock prices and daily changes (MarketStack)  
 ✅ **Train Schedules** - Next departure times for Sydney trains (Transport NSW)  
@@ -176,7 +176,7 @@ Sydney                         Wednesday 27 Dec 2023
 25.3°C
                                Partly Cloudy
 Max: 28°C | Min: 22°C         Feels like: 24.1°C
-                               Humidity: 65%
+                               Precipitation: 65%
 Train to city: 14:35          Wind: 3.2 m/s NW
 via Central
                                AAPL: USD 195.50, +2.30%
@@ -202,11 +202,11 @@ Update: 27 Dec 2023 @ 14:30
 - Try powering on/off the device
 
 ### API Error Displayed
-- Verify API key is complete (64 characters, no spaces)
-- Check OpenWeatherMap account - API enabled?
+- Verify API key is correct and complete (no spaces)
+- Check Google Cloud Console - Weather API and Geocoding API enabled?
 - Verify city name in English (e.g., "London" not "Londres")
 - Verify country code is correct (2-letter ISO code)
-- Check if you've exceeded free tier API limits (1000/day)
+- Check if you've exceeded free tier API limits
 
 ### Display Blank
 - Check USB power connection
@@ -230,10 +230,10 @@ Update: 27 Dec 2023 @ 14:30
 | WiFi SSID | `wifi.ssid` | "MyNetwork" | Case-sensitive, 2.4GHz only |
 | WiFi Password | `wifi.password` | "password123" | Case-sensitive |
 
-### Weather Settings (OpenWeatherMap) - Required
+### Weather Settings (Google Weather API) - Required
 | Setting | Key | Example | Notes |
 |---------|-----|---------|-------|
-| API Key | `weather.api_key` | "abc123...xyz" | Get from openweathermap.org (64 chars) |
+| API Key | `weather.api_key` | "AIzaSyBi1B070..." | Get from Google Cloud Console |
 | City | `weather.city` | "Sydney" | English name only |
 | Country Code | `weather.country` | "AU" | ISO 3166 (2 letters) |
 | Units | `weather.units` | "metric" | "metric" (°C) or "imperial" (°F) |
