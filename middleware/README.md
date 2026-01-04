@@ -64,7 +64,7 @@ Edit `config/config.json`:
 ```json
 {
   "weather": {
-    "api_key": "YOUR_OPENWEATHERMAP_API_KEY",
+    "api_key": "YOUR_GOOGLE_MAPS_API_KEY",
     "city": "Sydney",
     "country": "AU",
     "units": "metric"
@@ -85,7 +85,7 @@ Edit `config/config.json`:
 }
 ```
 
-Only the weather API key is required. Others are optional.
+Only the Google Maps API key (for weather) is required. Others are optional.
 
 ## Deployment
 
@@ -108,7 +108,7 @@ python app.py
 
 ## Documentation
 
-See [MIDDLEWARE_SETUP.md](MIDDLEWARE_SETUP.md) for detailed setup instructions, deployment on Raspberry Pi, troubleshooting, and more.
+See [MIDDLEWARE_SETUP.md](../docs/MIDDLEWARE_SETUP.md) for detailed setup instructions, deployment on Raspberry Pi, troubleshooting, and more.
 
 ## Requirements
 

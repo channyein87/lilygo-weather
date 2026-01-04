@@ -12,7 +12,7 @@ The display board directly calls each API service (weather, crypto, stock, train
 The display board makes a single request to a local middleware service that aggregates data from all upstream APIs. This significantly improves battery life (2-3x improvement).
 
 The display supports multiple data sources:
-- **Weather** (OpenWeatherMap) - Required in direct mode
+- **Weather** (Google Weather API) - Required in direct mode
 - **Cryptocurrency** (CoinGecko) - Optional
 - **Stock Market** (MarketStack) - Optional
 - **Train Schedules** (Transport NSW) - Optional, Sydney area only
@@ -44,9 +44,9 @@ Open `data/config.json` in your editor and fill in your actual values:
     "url": ""
   },
   "weather": {
-    "api_key": "YOUR_OPENWEATHERMAP_API_KEY",
+    "api_key": "YOUR_GOOGLE_MAPS_API_KEY",
     "city": "Sydney",
-    "country": "AU",
+    "country": "Australia",
     "units": "metric"
   },
   "ntp": {
@@ -76,21 +76,23 @@ Open `data/config.json` in your editor and fill in your actual values:
 
 **Important:**
 - WiFi SSID and password are case-sensitive
-- OpenWeatherMap API key is required (64 characters) in direct mode
+- Google Maps API key is required in direct mode
 - NTP server and timezone are required for accurate time display
 - CoinGecko, MarketStack, and Transport NSW APIs are optional
 - Sleep schedule is optional (leave empty to disable)
 - City name should be in English (e.g., "Sydney" not "Sídney")
-- Country code must be 2-letter ISO 3166 code
+- Country name should be the full country name (e.g., "Australia", "France")
 
 ### 3. Get API Keys
 
-#### OpenWeatherMap (Required)
-- Visit [openweathermap.org](https://openweathermap.org)
-- Click "Sign Up" or "Log In"
-- Go to your account → API Keys section
-- Copy your API key (should be 64 characters)
+#### Google Maps Platform (Required)
+- Visit [Google Cloud Console](https://console.cloud.google.com/apis)
+- Create a new project or select an existing one
+- Enable the **Geocoding API** and **Weather API**
+- Go to **Credentials** → **Create Credentials** → **API Key**
+- Copy your API key (format: "AIzaSy...")
 - Paste it into `config.json` in the `weather.api_key` field
+- **Note:** Free tier includes 28,500 API calls per month
 
 #### CoinGecko (Optional)
 - Visit [coingecko.com](https://www.coingecko.com/en/api)
@@ -164,7 +166,7 @@ Edit `data/config.json` with minimal settings:
   "weather": {
     "api_key": "",
     "city": "Sydney",
-    "country": "AU",
+    "country": "Australia",
     "units": "metric"
   },
   "crypto": {
@@ -259,7 +261,7 @@ Watch the serial output for:
 |-----|------|---------|-------|
 | `weather.api_key` | String | "abc123...xyz" | From openweathermap.org (64 chars, not required in middleware mode) |
 | `weather.city` | String | "Sydney" | City name in English |
-| `weather.country` | String | "AU" | ISO 3166 country code (2 letters) |
+| `weather.country` | String | "Australia" | Full country name (e.g., "Australia", "France") |
 | `weather.units` | String | "metric" | "metric" (°C) or "imperial" (°F) |
 
 ### NTP Time Settings (Required)

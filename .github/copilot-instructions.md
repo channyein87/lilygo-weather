@@ -12,7 +12,7 @@ This is the **LILYGO T5 Information Display** - a complete information dashboard
 - **Refresh Rate**: ~1-3 seconds for full update
 - **Configuration**: JSON file stored in LittleFS (no firmware edits needed)
 - **APIs**: 
-  - OpenWeatherMap (weather, required)
+  - Google Weather API (weather, required)
   - CoinGecko (crypto prices, optional)
   - MarketStack (stock data, optional)
   - Transport NSW (train schedules, optional)
@@ -43,11 +43,14 @@ lilygo-weather/
 │   └── T5-ePaper-S3.json       # Board definition
 ├── lib/
 │   ├── fonts/                   # Lexend font family (10-40 sizes)
-│   └── icons/                   # OpenWeatherMap weather icons (32x32)
+│   └── icons/                   # Weather condition icons (clear, rain, snow, etc.)
 ├── platformio.ini               # Build configuration
 ├── README.md                    # User guide
-├── CONFIG_SETUP.md             # Configuration guide
-└── LilyGo_API_Reference.md     # Display library API documentation
+├── docs/
+│   ├── CONFIG_SETUP.md         # Configuration guide
+│   ├── MIDDLEWARE_SETUP.md     # Middleware deployment guide
+│   └── LilyGo_API_Reference.md # Display library API documentation
+└── temp/                        # Temporary files
 ```
 
 ## Important Implementation Details
@@ -55,7 +58,7 @@ lilygo-weather/
 ### Configuration Loading
 - Configuration stored in `data/config.json` via LittleFS
 - Device reads WiFi credentials, API keys, preferences from JSON
-- Required: WiFi, OpenWeatherMap API, NTP time settings
+- Required: WiFi, Google Maps API key, NTP time settings
 - Optional: CoinGecko (crypto), MarketStack (stocks), Transport NSW (trains)
 - Update interval is configurable (1-60 minutes, default 5)
 - **Must upload filesystem first**: `pio run -t uploadfs`
@@ -64,18 +67,18 @@ lilygo-weather/
 - **Setup**: Initialize display, WiFi, NTP, read config, fetch all data sources
 - **Loop**: Sleep for update interval, fetch all data, update display, repeat
 - **Data Functions**: 
-  - `fetchWeatherData()`: Gets weather from OpenWeatherMap
+  - `fetchWeatherData()`: Gets weather from Google Weather API (2-step: geocoding + weather)
   - `fetchCryptoData()`: Gets crypto prices from CoinGecko
   - `fetchStockData()`: Gets stock data from MarketStack
   - `fetchTrainData()`: Gets train times from Transport NSW
 - **displayWeather()**: Renders all information on screen
 - Uses Lexend fonts (sizes 10, 14, 18, 28, 32, 40) for text rendering
-- Uses OpenWeatherMap icons (weather_01d, weather_02d, etc.) for conditions
+- Uses weather icons (clear_day, rain, snow, etc.) mapped from condition types
 
 ### Display Libraries & Data Sources
 - **epd_driver.h**: E-paper control (poweron, poweroff, clear, draw functions)
 - **Lexend fonts**: Font files in `lib/fonts/` (lexend10.h through lexend40.h)
-- **Weather icons**: Icon files in `lib/icons/` (owm_*.h files for each condition)
+- **Weather icons**: Icon files in `lib/icons/` (clear_day.h, rain.h, snow.h, etc.)
 - **HTTPClient**: For all API requests
 - **ArduinoJson**: For parsing API responses
 - **Timezone**: For NTP time conversion
@@ -90,9 +93,9 @@ Users must create `data/config.json` from `data/config.template.json` with:
     "password": "YOUR_PASSWORD"
   },
   "weather": {
-    "api_key": "YOUR_OPENWEATHERMAP_API_KEY",
+    "api_key": "YOUR_GOOGLE_MAPS_API_KEY",
     "city": "Sydney",
-    "country": "AU",
+    "country": "Australia",
     "units": "metric"
   },
   "ntp": {
@@ -121,7 +124,7 @@ Users must create `data/config.json` from `data/config.template.json` with:
 - City name in English only
 - Country code is ISO 3166 (2 letters)
 - Units: "metric" (°C) or "imperial" (°F)
-- OpenWeatherMap API key: 64 characters (required)
+- Google Maps API key: required for weather (format: AIzaSy...)
 - CoinGecko API key: starts with "CG-" (optional)
 - MarketStack API key: free tier 100 calls/month (optional)
 - Transport NSW: Sydney trains only (optional)
@@ -153,7 +156,7 @@ Then run: `pio run -t uploadfs` (only the filesystem, no firmware change)
 **Startup messages (should see):**
 - "Config loaded successfully" - configuration file found
 - "WiFi connected!" - WiFi connected
-- "Fetching weather data..." - OpenWeatherMap API call initiated
+- "Fetching weather data from Google Weather API..." - Google API call initiated
 - "Weather data parsed successfully" - Weather JSON parsing worked
 - "Fetching crypto data..." - CoinGecko API call (if configured)
 - "Crypto data parsed successfully" - Crypto JSON parsing worked
@@ -182,8 +185,8 @@ Then run: `pio run -t uploadfs` (only the filesystem, no firmware change)
 - **Firmware**: `src/main.ino` (only file that matters)
 - **Configuration**: `data/config.json` (user-created from template)
 - **Fonts**: `lib/fonts/lexend*.h` (10, 14, 18, 28, 32, 40 point sizes)
-- **Icons**: `lib/icons/owm_*.h` (weather condition icons)
-- **Documentation**: README.md, CONFIG_SETUP.md, LilyGo_API_Reference.md
+- **Icons**: `lib/icons/*.h` (weather condition icons: clear_day, rain, snow, etc.)
+- **Documentation**: README.md, docs/CONFIG_SETUP.md, docs/LilyGo_API_Reference.md
 - **Temporary**: `temp/` directory (test files, logs, conversions)
 
 ## Debugging Workflow
@@ -212,7 +215,7 @@ pio run -t upload           # Re-upload firmware
 1. Check serial output: `pio device monitor -b 115200`
 2. Look for error messages (WiFi, API, JSON parsing)
 3. Verify config.json has correct values
-4. Check API key is active on openweathermap.org
+4. Check API key is active in Google Cloud Console
 
 ### No Serial Output
 - Check USB cable is data cable (not power-only)
@@ -225,7 +228,7 @@ pio run -t upload           # Re-upload firmware
 |-------|-------|-----|
 | "Config file not found" | Skipped `pio run -t uploadfs` | Run filesystem upload first |
 | WiFi won't connect | Wrong SSID/password or 5GHz | Check config.json, use 2.4GHz |
-| "API Error" on display | Invalid API key or exceeded limits | Verify key on openweathermap.org |
+| "API Error" on display | Invalid API key or exceeded limits | Verify key in Google Cloud Console |
 | Display stays blank | Display init failure or bad config | Check serial for errors |
 | Weather won't update | Update interval not passed | Wait for configured interval |
 | Can't compile | Missing fonts or icons | Check #include statements |
@@ -233,7 +236,7 @@ pio run -t upload           # Re-upload firmware
 ## References
 
 ### API Documentation
-- **OpenWeatherMap**: https://openweathermap.org/api (weather, free 1000 calls/day)
+- **Google Maps Platform**: https://console.cloud.google.com/apis (weather, free 28.5k calls/month)
 - **CoinGecko**: https://www.coingecko.com/en/api (crypto, free 10k calls/month)
 - **MarketStack**: https://marketstack.com/ (stocks, free 100 calls/month)
 - **Transport NSW**: https://opendata.transport.nsw.gov.au/ (trains, free)

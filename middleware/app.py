@@ -110,7 +110,7 @@ def _get_stale_cached_stock_data(error_type):
     return None
 
 def fetch_weather_data():
-    """Fetch weather data from OpenWeatherMap API"""
+    """Fetch weather data from Google Weather API"""
     try:
         weather_config = config.get('weather', {})
         api_key = weather_config.get('api_key')
@@ -123,22 +123,76 @@ def fetch_weather_data():
             return {'error': 'Weather API key not configured'}
         
         logger.info(f"Fetching weather data for {city}, {country}")
-        url = f"https://api.openweathermap.org/data/2.5/weather?q={city},{country}&appid={api_key}&units={units}"
-        response = requests.get(url, timeout=10)
-        response.raise_for_status()
         
-        data = response.json()
-        logger.info(f"Weather data fetched successfully - {city}: {data['main']['temp']}°{units[0].upper()}")
+        # Step 1: Get latitude and longitude using Geocoding API
+        geocode_url = f"https://maps.googleapis.com/maps/api/geocode/json?address={city},{country}&key={api_key}"
+        logger.info(f"Geocoding request: {city}, {country}")
+        
+        geocode_response = requests.get(geocode_url, timeout=10)
+        geocode_response.raise_for_status()
+        geocode_data = geocode_response.json()
+        
+        if geocode_data.get('status') != 'OK':
+            logger.error(f"Geocoding error: {geocode_data.get('status')}")
+            return {'error': f"Geocoding error: {geocode_data.get('status')}"}
+        
+        location = geocode_data['results'][0]['geometry']['location']
+        latitude = location['lat']
+        longitude = location['lng']
+        
+        logger.info(f"Location found: Lat={latitude}, Lng={longitude}")
+        
+        # Step 2: Get weather data using coordinates
+        weather_url = f"https://weather.googleapis.com/v1/currentConditions:lookup?key={api_key}&location.latitude={latitude}&location.longitude={longitude}"
+        weather_response = requests.get(weather_url, timeout=10)
+        weather_response.raise_for_status()
+        
+        data = weather_response.json()
+        
+        # Extract weather data from Google Weather API format
+        temp_celsius = data.get('temperature', {}).get('degrees', 0.0)
+        feels_celsius = data.get('feelsLikeTemperature', {}).get('degrees', 0.0)
+        precipitation_prob = data.get('precipitation', {}).get('probability', {}).get('percent', 0)
+        
+        # Wind speed - check unit and convert to m/s if needed
+        wind_value = data.get('wind', {}).get('speed', {}).get('value', 0.0)
+        wind_unit = data.get('wind', {}).get('speed', {}).get('unit', 'KILOMETERS_PER_HOUR')
+        wind_ms = wind_value
+        
+        # Convert from km/h to m/s if unit is KILOMETERS_PER_HOUR
+        if wind_unit == 'KILOMETERS_PER_HOUR':
+            wind_ms = wind_value / 3.6
+        
+        # Get max/min from history
+        history = data.get('currentConditionsHistory', {})
+        max_celsius = history.get('maxTemperature', {}).get('degrees', temp_celsius)
+        min_celsius = history.get('minTemperature', {}).get('degrees', temp_celsius)
+        
+        # Get weather condition
+        weather_condition = data.get('weatherCondition', {})
+        condition_desc = weather_condition.get('description', {}).get('text', 'Unknown')
+        condition_type = weather_condition.get('type', 'UNKNOWN')
+        is_daytime = data.get('isDaytime', True)
+        
+        # Convert to imperial if needed
+        if units == 'imperial':
+            temp_celsius = temp_celsius * 9.0 / 5.0 + 32.0
+            feels_celsius = feels_celsius * 9.0 / 5.0 + 32.0
+            max_celsius = max_celsius * 9.0 / 5.0 + 32.0
+            min_celsius = min_celsius * 9.0 / 5.0 + 32.0
+        
+        logger.info(f"Weather data fetched successfully - {city}: {temp_celsius}°{units[0].upper()}")
         
         return {
-            'temp': round(data['main']['temp'], 1),
-            'feels_like': round(data['main']['feels_like'], 1),
-            'temp_max': round(data['main']['temp_max'], 1),
-            'temp_min': round(data['main']['temp_min'], 1),
-            'humidity': data['main']['humidity'],
-            'wind_speed': round(data['wind']['speed'], 1),
-            'condition': data['weather'][0]['main'],
-            'icon_code': data['weather'][0]['icon'],
+            'temp': round(temp_celsius, 1),
+            'feels_like': round(feels_celsius, 1),
+            'temp_max': round(max_celsius, 1),
+            'temp_min': round(min_celsius, 1),
+            'precipitation_prob': precipitation_prob,
+            'wind_speed': round(wind_ms, 1),
+            'condition': condition_desc,
+            'condition_type': condition_type,
+            'is_daytime': is_daytime,
             'city': city,
             'units': units
         }

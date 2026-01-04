@@ -12,7 +12,7 @@
   "weather": {
     "api_key": "abc123def456ghi789jkl012mno345pqr678stu901vwx234yz567890abcde12",
     "city": "Sydney",
-    "country": "AU",
+    "country": "Australia",
     "units": "metric"
   },
   "ntp": {

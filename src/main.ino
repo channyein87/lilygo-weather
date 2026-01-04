@@ -15,24 +15,15 @@
 #include <StreamUtils.h>
 
 // Weather icons
-#include <owm_01d.h>
-#include <owm_01n.h>
-#include <owm_02d.h>
-#include <owm_02n.h>
-#include <owm_03d.h>
-#include <owm_03n.h>
-#include <owm_04d.h>
-#include <owm_04n.h>
-#include <owm_09d.h>
-#include <owm_09n.h>
-#include <owm_10d.h>
-#include <owm_10n.h>
-#include <owm_11d.h>
-#include <owm_11n.h>
-#include <owm_13d.h>
-#include <owm_13n.h>
-#include <owm_50d.h>
-#include <owm_50n.h>
+#include <clear_day.h>
+#include <clear_night.h>
+#include <cloudy.h>
+#include <hail.h>
+#include <rain.h>
+#include <snow.h>
+#include <thunderstorms.h>
+#include <unknown.h>
+#include <windy.h>
 
 /*
  * LILYGO T5 4.7" E-Paper Display - Weather Display
@@ -107,14 +98,15 @@ unsigned long last_update = 0;
 int loop_count = 0;  // Counter for loop iterations
 String current_temp = "--";
 String current_condition = "Loading...";
-String current_humidity = "--";
+String current_precipitation = "--";
 String wind_speed = "--";
 String feels_like = "--";
 String temp_max = "--";
 String temp_min = "--";
 String current_date = "---";
 String current_day = "---";
-String current_icon_code = "01d";  // Default to clear day icon
+String current_condition_type = "UNKNOWN";  // Google Weather API condition type
+bool is_daytime = true;  // Is it currently daytime?
 
 // Crypto data
 String crypto_price = "--";
@@ -136,49 +128,82 @@ struct IconData {
     uint16_t height;
 };
 
-// Get icon data based on icon code from API (e.g., "01d", "02n", etc.)
-IconData getIconData(const String &icon_code) {
-    // Map icon codes to their respective data and dimensions
-    if (icon_code == "01d") {
-        return {owm_01d_data, owm_01d_width, owm_01d_height};
-    } else if (icon_code == "01n") {
-        return {owm_01n_data, owm_01n_width, owm_01n_height};
-    } else if (icon_code == "02d") {
-        return {owm_02d_data, owm_02d_width, owm_02d_height};
-    } else if (icon_code == "02n") {
-        return {owm_02n_data, owm_02n_width, owm_02n_height};
-    } else if (icon_code == "03d") {
-        return {owm_03d_data, owm_03d_width, owm_03d_height};
-    } else if (icon_code == "03n") {
-        return {owm_03n_data, owm_03n_width, owm_03n_height};
-    } else if (icon_code == "04d") {
-        return {owm_04d_data, owm_04d_width, owm_04d_height};
-    } else if (icon_code == "04n") {
-        return {owm_04n_data, owm_04n_width, owm_04n_height};
-    } else if (icon_code == "09d") {
-        return {owm_09d_data, owm_09d_width, owm_09d_height};
-    } else if (icon_code == "09n") {
-        return {owm_09n_data, owm_09n_width, owm_09n_height};
-    } else if (icon_code == "10d") {
-        return {owm_10d_data, owm_10d_width, owm_10d_height};
-    } else if (icon_code == "10n") {
-        return {owm_10n_data, owm_10n_width, owm_10n_height};
-    } else if (icon_code == "11d") {
-        return {owm_11d_data, owm_11d_width, owm_11d_height};
-    } else if (icon_code == "11n") {
-        return {owm_11n_data, owm_11n_width, owm_11n_height};
-    } else if (icon_code == "13d") {
-        return {owm_13d_data, owm_13d_width, owm_13d_height};
-    } else if (icon_code == "13n") {
-        return {owm_13n_data, owm_13n_width, owm_13n_height};
-    } else if (icon_code == "50d") {
-        return {owm_50d_data, owm_50d_width, owm_50d_height};
-    } else if (icon_code == "50n") {
-        return {owm_50n_data, owm_50n_width, owm_50n_height};
-    } else {
-        // Default fallback to clear day icon
-        return {owm_01d_data, owm_01d_width, owm_01d_height};
+// Get icon data based on Google Weather API condition type and day/night status
+// Maps weatherCondition.type to appropriate icon
+IconData getIconData(const String &condition_type, bool is_daytime) {
+    String condition_lower = condition_type;
+    condition_lower.toLowerCase();
+    
+    // Check for thunderstorm conditions (but not snowstorm)
+    if (condition_lower.indexOf("thunder") >= 0) {
+        return {thunderstorms_data, thunderstorms_width, thunderstorms_height};
     }
+    
+    // Check for hail (check before rain since HAIL_SHOWERS contains "showers")
+    if (condition_lower.indexOf("hail") >= 0) {
+        return {hail_data, hail_width, hail_height};
+    }
+    
+    // Check for snow conditions (check before "storm" to handle SNOWSTORM)
+    if (condition_lower.indexOf("snow") >= 0 || condition_lower.indexOf("blowing_snow") >= 0) {
+        return {snow_data, snow_width, snow_height};
+    }
+    
+    // Check for thunderstorm by "storm" (after snow check to avoid catching SNOWSTORM)
+    if (condition_lower.indexOf("storm") >= 0) {
+        return {thunderstorms_data, thunderstorms_width, thunderstorms_height};
+    }
+    
+    // Check for rain conditions (covers all rain and shower types)
+    if (condition_lower.indexOf("rain") >= 0 || condition_lower.indexOf("shower") >= 0 || condition_lower.indexOf("drizzle") >= 0) {
+        return {rain_data, rain_width, rain_height};
+    }
+    
+    // Check for mostly clear (before generic "clear" check)
+    if (condition_lower.indexOf("mostly_clear") >= 0) {
+        if (is_daytime) {
+            return {clear_day_data, clear_day_width, clear_day_height};
+        } else {
+            return {clear_night_data, clear_night_width, clear_night_height};
+        }
+    }
+    
+    // Check for partly cloudy (before generic "cloudy" check)
+    if (condition_lower.indexOf("partly") >= 0) {
+        // Use clear icon with sun for partly cloudy
+        if (is_daytime) {
+            return {clear_day_data, clear_day_width, clear_day_height};
+        } else {
+            return {clear_night_data, clear_night_width, clear_night_height};
+        }
+    }
+    
+    // Check for mostly cloudy (before generic "cloudy" check)
+    if (condition_lower.indexOf("mostly_cloudy") >= 0) {
+        return {cloudy_data, cloudy_width, cloudy_height};
+    }
+    
+    // Check for cloudy conditions (after specific cloudy variants)
+    if (condition_lower.indexOf("cloud") >= 0 || condition_lower.indexOf("overcast") >= 0) {
+        return {cloudy_data, cloudy_width, cloudy_height};
+    }
+    
+    // Check for clear conditions (after mostly_clear)
+    if (condition_lower.indexOf("clear") >= 0 || condition_lower.indexOf("sunny") >= 0) {
+        if (is_daytime) {
+            return {clear_day_data, clear_day_width, clear_day_height};
+        } else {
+            return {clear_night_data, clear_night_width, clear_night_height};
+        }
+    }
+    
+    // Check for windy conditions (last weather check)
+    if (condition_lower.indexOf("wind") >= 0 || condition_lower.indexOf("breezy") >= 0 || condition_lower.indexOf("gust") >= 0) {
+        return {windy_data, windy_width, windy_height};
+    }
+    
+    // Default fallback to unknown icon
+    return {unknown_data, unknown_width, unknown_height};
 }
 
 void setup() {
@@ -426,19 +451,23 @@ void fetchMiddlewareData() {
                 float feels = weather["feels_like"] | 0.0;
                 float t_max = weather["temp_max"] | 0.0;
                 float t_min = weather["temp_min"] | 0.0;
-                int humidity = weather["humidity"] | 0;
+                int precipitation_prob = weather["precipitation_prob"] | 0;
                 float wind = weather["wind_speed"] | 0.0;
                 const char* condition = weather["condition"] | "Unknown";
-                const char* icon = weather["icon_code"] | "01d";
+                const char* condition_type = weather["condition_type"] | "UNKNOWN";
+                bool daytime = weather["is_daytime"] | true;
+                const char* unit = weather["units"] | "metric";
                 
-                current_temp = String(temp, 0) + "°C";
-                feels_like = String(feels, 0) + "°C";
+                String unit_symbol = String(unit) == "imperial" ? "°F" : "°C";
+                current_temp = String(temp, 0) + unit_symbol;
+                feels_like = String(feels, 0) + unit_symbol;
                 temp_max = String(t_max, 0);
                 temp_min = String(t_min, 0);
-                current_humidity = String(humidity) + "%";
+                current_precipitation = String(precipitation_prob) + "%";
                 wind_speed = String(wind, 0) + " m/s";
                 current_condition = condition;
-                current_icon_code = icon;
+                current_condition_type = condition_type;
+                is_daytime = daytime;
                 
                 Serial.println("Weather data parsed from middleware");
             } else {
@@ -530,53 +559,138 @@ void fetchWeatherData() {
         return;
     }
     
-    Serial.println("Fetching weather data...");
+    Serial.println("Fetching weather data from Google Weather API...");
     
-    // Build API URL
-    String url = String("https://api.openweathermap.org/data/2.5/weather?q=") + 
-                 city + "," + country_code + 
-                 "&appid=" + owm_api_key + 
-                 "&units=" + units;
+    // Step 1: Get latitude and longitude using Geocoding API
+    String geocode_url = String("https://maps.googleapis.com/maps/api/geocode/json?address=") + 
+                         city + "," + country_code + 
+                         "&key=" + owm_api_key;
+    
+    Serial.println("Geocoding URL: " + geocode_url);
     
     HTTPClient http;
-    http.begin(url);
+    http.begin(geocode_url);
     
     int httpCode = http.GET();
     
+    if (httpCode != 200) {
+        Serial.print("Geocoding HTTP Error: ");
+        Serial.println(httpCode);
+        current_condition = "Geocoding Error";
+        http.end();
+        return;
+    }
+    
+    String geo_payload = http.getString();
+    Serial.println("Geocoding Response: " + geo_payload);
+    
+    // Parse geocoding JSON
+    JsonDocument geo_doc;
+    DeserializationError geo_error = deserializeJson(geo_doc, geo_payload);
+    
+    if (geo_error) {
+        Serial.println("Geocoding JSON parsing error");
+        current_condition = "Parse Error";
+        http.end();
+        return;
+    }
+    
+    // Extract latitude and longitude
+    const char* status = geo_doc["status"] | "";
+    if (strcmp(status, "OK") != 0) {
+        Serial.println("Geocoding API error: " + String(status));
+        current_condition = "Location Error";
+        http.end();
+        return;
+    }
+    
+    float latitude = geo_doc["results"][0]["geometry"]["location"]["lat"] | 0.0;
+    float longitude = geo_doc["results"][0]["geometry"]["location"]["lng"] | 0.0;
+    
+    Serial.print("Location: Lat=");
+    Serial.print(latitude, 6);
+    Serial.print(", Lng=");
+    Serial.println(longitude, 6);
+    
+    http.end();
+    
+    // Step 2: Get weather data using coordinates
+    String weather_url = String("https://weather.googleapis.com/v1/currentConditions:lookup?key=") + 
+                         owm_api_key + 
+                         "&location.latitude=" + String(latitude, 6) + 
+                         "&location.longitude=" + String(longitude, 6);
+    
+    Serial.println("Weather URL: " + weather_url);
+    
+    http.begin(weather_url);
+    httpCode = http.GET();
+    
     if (httpCode == 200) {
         String payload = http.getString();
-        Serial.println("API Response: " + payload);
+        Serial.println("Weather Response: " + payload);
         
         // Parse JSON
         JsonDocument doc;
         DeserializationError error = deserializeJson(doc, payload);
         
         if (!error) {
-            // Extract weather data
-            current_temp = String((float)doc["main"]["temp"], 0) + "°C";
-            feels_like = String((float)doc["main"]["feels_like"], 0) + "°C";
-            current_humidity = String((int)doc["main"]["humidity"]) + "%";
-            wind_speed = String((float)doc["wind"]["speed"], 0) + " m/s";
-            temp_max = String((float)doc["main"]["temp_max"], 0);
-            temp_min = String((float)doc["main"]["temp_min"], 0);
+            // Extract weather data from Google Weather API format
+            float temp_celsius = doc["temperature"]["degrees"] | 0.0;
+            float feels_celsius = doc["feelsLikeTemperature"]["degrees"] | 0.0;
+            int precipitation_prob = doc["precipitation"]["probability"]["percent"] | 0;
             
-            // Get weather condition safely
-            const char* weather = doc["weather"][0]["main"] | "Unknown";
-            current_condition = weather;
+            // Wind speed - check unit and convert to m/s if needed
+            float wind_value = doc["wind"]["speed"]["value"] | 0.0;
+            const char* wind_unit = doc["wind"]["speed"]["unit"] | "KILOMETERS_PER_HOUR";
+            float wind_ms = wind_value;
             
-            // Get weather icon code from API response (e.g., "01d", "02n", etc.)
-            const char* icon = doc["weather"][0]["icon"] | "01d";
-            current_icon_code = icon;
+            // Convert from km/h to m/s if unit is KILOMETERS_PER_HOUR
+            if (strcmp(wind_unit, "KILOMETERS_PER_HOUR") == 0) {
+                wind_ms = wind_value / 3.6;
+            }
             
-            Serial.print("Weather icon code: ");
-            Serial.println(current_icon_code);
+            // Get max/min from history
+            float max_celsius = doc["currentConditionsHistory"]["maxTemperature"]["degrees"] | temp_celsius;
+            float min_celsius = doc["currentConditionsHistory"]["minTemperature"]["degrees"] | temp_celsius;
+            
+            // Convert to display units
+            String unit_symbol = units == "imperial" ? "°F" : "°C";
+            if (units == "imperial") {
+                temp_celsius = temp_celsius * 9.0 / 5.0 + 32.0;
+                feels_celsius = feels_celsius * 9.0 / 5.0 + 32.0;
+                max_celsius = max_celsius * 9.0 / 5.0 + 32.0;
+                min_celsius = min_celsius * 9.0 / 5.0 + 32.0;
+            }
+            
+            current_temp = String((int)temp_celsius) + unit_symbol;
+            feels_like = String((int)feels_celsius) + unit_symbol;
+            current_precipitation = String(precipitation_prob) + "%";
+            wind_speed = String((int)wind_ms) + " m/s";
+            temp_max = String((int)max_celsius);
+            temp_min = String((int)min_celsius);
+            
+            // Get weather condition description
+            const char* description = doc["weatherCondition"]["description"]["text"] | "Unknown";
+            current_condition = description;
+            
+            // Get condition type for icon mapping
+            const char* type = doc["weatherCondition"]["type"] | "UNKNOWN";
+            current_condition_type = type;
+            
+            // Get day/night status
+            is_daytime = doc["isDaytime"] | true;
+            
+            Serial.print("Weather condition type: ");
+            Serial.println(current_condition_type);
+            Serial.print("Is daytime: ");
+            Serial.println(is_daytime ? "Yes" : "No");
             Serial.println("Weather data parsed successfully");
         } else {
             Serial.println("JSON parsing error");
             current_condition = "Parse Error";
         }
     } else {
-        Serial.print("HTTP Error: ");
+        Serial.print("Weather HTTP Error: ");
         Serial.println(httpCode);
         current_condition = "API Error";
     }
@@ -901,8 +1015,8 @@ void displayWeather() {
     left_x = 190;
     left_y += 80;
     
-    // Get the appropriate icon data based on API response
-    IconData icon = getIconData(current_icon_code);
+    // Get the appropriate icon data based on Google Weather API condition type
+    IconData icon = getIconData(current_condition_type, is_daytime);
     
     Rect_t area = {
         .x = left_x,
@@ -962,10 +1076,10 @@ void displayWeather() {
     snprintf(display_buffer, sizeof(display_buffer), "Feels like: %s", feels_like.c_str());
     writeln((GFXfont *)&Lexend18, display_buffer, &right_x, &right_y, NULL);
 
-    // Humidity
+    // Precipitation
     right_x = 500;
     right_y += 60;
-    snprintf(display_buffer, sizeof(display_buffer), "Humidity: %s", current_humidity.c_str());
+    snprintf(display_buffer, sizeof(display_buffer), "Precipitation: %s", current_precipitation.c_str());
     writeln((GFXfont *)&Lexend18, display_buffer, &right_x, &right_y, NULL);
 
     // Wind
