@@ -10,9 +10,9 @@
     "url": "http://192.168.1.100:5000/api/data"
   },
   "weather": {
-    "api_key": "YOUR_OPENWEATHERMAP_API_KEY",
+    "api_key": "YOUR_GOOGLE_MAPS_API_KEY",
     "city": "Sydney",
-    "country": "AU",
+    "country": "Australia",
     "units": "metric"
   },
   "ntp": {
