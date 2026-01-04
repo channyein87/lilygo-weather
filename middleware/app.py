@@ -8,8 +8,9 @@ import requests
 import os
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor
+import threading
 
 # Configure logging
 logging.basicConfig(
@@ -84,6 +85,17 @@ def load_config():
     return config_data
 
 config = load_config()
+
+# Cache for stock data (MarketStack has 100 requests/month limit on free tier)
+# We cache for 24 hours to make ~1 request per day
+stock_cache = {
+    'data': None,
+    'timestamp': None,
+    'lock': threading.Lock()
+}
+
+# Cache duration: 24 hours
+STOCK_CACHE_DURATION = timedelta(hours=24)
 
 def fetch_weather_data():
     """Fetch weather data from OpenWeatherMap API"""
@@ -191,7 +203,15 @@ def fetch_crypto_data():
         return {'error': str(e)}
 
 def fetch_stock_data():
-    """Fetch stock market data from MarketStack API"""
+    """
+    Fetch stock market data from MarketStack API with 24-hour caching.
+    
+    MarketStack free tier allows only 100 requests per month (~3 per day).
+    To conserve API quota, we cache the stock data for 24 hours and only
+    fetch new data once per day.
+    """
+    global stock_cache
+    
     try:
         stock_config = config.get('stock', {})
         api_key = stock_config.get('api_key')
@@ -201,38 +221,85 @@ def fetch_stock_data():
             logger.warning("Stock API key not configured")
             return {'error': 'Stock API key not configured'}
         
-        logger.info(f"Fetching stock data for {symbol}")
-        url = f"http://api.marketstack.com/v1/eod/latest?access_key={api_key}&symbols={symbol}"
-        response = requests.get(url, timeout=10)
-        response.raise_for_status()
-        
-        data = response.json()
-        
-        if 'data' in data and len(data['data']) > 0:
-            stock_data = data['data'][0]
-            open_price = stock_data.get('open', 0)
-            close_price = stock_data.get('close', 0)
-            change = close_price - open_price
+        # Use lock to ensure thread-safe access and prevent duplicate API calls
+        with stock_cache['lock']:
+            # Check if we have valid cached data
+            if (stock_cache['data'] is not None and 
+                stock_cache['timestamp'] is not None):
+                
+                cache_age = datetime.utcnow() - stock_cache['timestamp']
+                
+                if cache_age < STOCK_CACHE_DURATION:
+                    # Cache is still valid, return cached data
+                    logger.info(f"Returning cached stock data for {symbol} (age: {cache_age})")
+                    return stock_cache['data']
+                else:
+                    logger.info(f"Stock cache expired (age: {cache_age}), fetching fresh data")
             
-            logger.info(f"Stock data fetched successfully - {symbol}: ${close_price:.2f} ({change:+.2f})")
-            return {
-                'symbol': symbol,
-                'price': round(close_price, 2),
-                'currency': 'USD',  # MarketStack free tier is US stocks only
-                'change': round(change, 2)
-            }
-        else:
-            logger.warning(f"Stock symbol not found: {symbol}")
-            return {'error': 'Stock symbol not found'}
+            # Cache miss or expired - fetch fresh data while holding the lock
+            # This ensures only one thread fetches data at a time
+            logger.info(f"Fetching stock data for {symbol} from MarketStack API")
+            url = f"http://api.marketstack.com/v1/eod/latest?access_key={api_key}&symbols={symbol}"
+            response = requests.get(url, timeout=10)
+            response.raise_for_status()
+            
+            data = response.json()
+            
+            if 'data' in data and len(data['data']) > 0:
+                stock_data = data['data'][0]
+                open_price = stock_data.get('open', 0)
+                close_price = stock_data.get('close', 0)
+                change = close_price - open_price
+                
+                result = {
+                    'symbol': symbol,
+                    'price': round(close_price, 2),
+                    'currency': 'USD',  # MarketStack free tier is US stocks only
+                    'change': round(change, 2)
+                }
+                
+                # Update cache
+                stock_cache['data'] = result
+                stock_cache['timestamp'] = datetime.utcnow()
+                
+                logger.info(f"Stock data fetched and cached successfully - {symbol}: ${close_price:.2f} ({change:+.2f})")
+                return result
+            else:
+                logger.warning(f"Stock symbol not found: {symbol}")
+                return {'error': 'Stock symbol not found'}
     except requests.exceptions.HTTPError as e:
         status_code = e.response.status_code if e.response else 'unknown'
         logger.error(f"HTTP error fetching stock data: {status_code} - {e}")
+        
+        # If API call fails but we have cached data, return cached data even if stale
+        with stock_cache['lock']:
+            if stock_cache['data'] is not None:
+                cache_age = datetime.utcnow() - stock_cache['timestamp'] if stock_cache['timestamp'] else None
+                logger.warning(f"API error, returning stale cached data (age: {cache_age})")
+                return stock_cache['data']
+        
         return {'error': f'HTTP {status_code}: {str(e)}'}
     except requests.exceptions.RequestException as e:
         logger.error(f"Network error fetching stock data: {e}")
+        
+        # If network error but we have cached data, return cached data even if stale
+        with stock_cache['lock']:
+            if stock_cache['data'] is not None:
+                cache_age = datetime.utcnow() - stock_cache['timestamp'] if stock_cache['timestamp'] else None
+                logger.warning(f"Network error, returning stale cached data (age: {cache_age})")
+                return stock_cache['data']
+        
         return {'error': f'Network error: {str(e)}'}
     except Exception as e:
         logger.error(f"Error fetching stock data: {e}")
+        
+        # If any error but we have cached data, return cached data even if stale
+        with stock_cache['lock']:
+            if stock_cache['data'] is not None:
+                cache_age = datetime.utcnow() - stock_cache['timestamp'] if stock_cache['timestamp'] else None
+                logger.warning(f"Unexpected error, returning stale cached data (age: {cache_age})")
+                return stock_cache['data']
+        
         return {'error': str(e)}
 
 def fetch_train_data():

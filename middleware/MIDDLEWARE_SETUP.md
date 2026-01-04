@@ -337,6 +337,23 @@ curl http://localhost:5000/api/stock
 curl http://localhost:5000/api/train
 ```
 
+### MarketStack API Quota
+
+The free tier of MarketStack allows only 100 requests per month. The middleware automatically caches stock data for 24 hours to stay within this limit.
+
+**Expected behavior**:
+- First request each day: Fetches fresh data from MarketStack
+- Subsequent requests: Returns cached data from memory
+- Cache age shown in logs: `Returning cached stock data for AAPL (age: 2:15:30)`
+
+**If you exceed the quota**:
+- Middleware will return stale cached data with a warning in logs
+- Stock data will still be displayed (using last successful fetch)
+- Wait until next month for quota to reset, or upgrade to paid tier
+
+**To check your quota usage**:
+Visit https://marketstack.com/dashboard and view your API usage statistics.
+
 ### Configuration Not Loading
 
 ```bash
@@ -375,9 +392,24 @@ docker stats
 
 ## Performance Optimization
 
+### API Caching
+
+The middleware implements intelligent caching to reduce API calls:
+
+**Stock Data (MarketStack)**:
+- **Cache Duration**: 24 hours
+- **Reason**: Free tier allows only 100 requests per month (~3 per day)
+- **Behavior**: First request of the day fetches fresh data, all subsequent requests return cached data
+- **Thread-Safe**: Multiple concurrent requests will only trigger one API call
+- **Fallback**: Returns stale cached data if API fails or rate limit is exceeded
+
+**Other APIs** (Weather, Crypto, Train):
+- Fetched on every request (no caching)
+- These APIs have more generous rate limits
+
 ### Reduce API Calls
 
-The middleware caches responses internally. To further optimize:
+To further optimize:
 
 1. Increase the display board's update interval
 2. Use individual endpoints instead of aggregated endpoint if you don't need all data
