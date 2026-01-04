@@ -1,5 +1,6 @@
 #include <epd_driver.h>
 #include <esp_adc_cal.h>
+#include <esp_sleep.h>
 #include <lexend10.h>
 #include <lexend14.h>
 #include <lexend18.h>
@@ -276,10 +277,12 @@ void setup() {
 }
 
 void loop() {
-    // Check if we're in sleep period
+    // Check if we're in sleep period and enter deep sleep if so
     if (isInSleepPeriod()) {
-        Serial.println("Display is in sleep period. Skipping update.");
-        // Check every 30 seconds during sleep (balances power savings with wakeup responsiveness)
+        Serial.println("Display is in sleep period.");
+        // Enter deep sleep until wakeup time (device will reset on wakeup)
+        enterDeepSleepUntilWakeup();
+        // If we didn't enter deep sleep (e.g., < 5 min until wakeup), use regular delay
         delay(30000);
         return;
     }
@@ -1152,6 +1155,67 @@ bool isInSleepPeriod() {
     }
     
     return is_sleeping;
+}
+
+// Calculate how many seconds until wakeup time and enter deep sleep
+// This function should only be called when isInSleepPeriod() returns true
+void enterDeepSleepUntilWakeup() {
+    if (!sleep_schedule_enabled) {
+        return;
+    }
+    
+    // Get current local time
+    time_t utc = time(nullptr);
+    TimeChangeRule *tcr;
+    time_t local = ausET.toLocal(utc, &tcr);
+    struct tm *timeinfo = localtime(&local);
+    
+    int current_hour = timeinfo->tm_hour;
+    int current_minute = timeinfo->tm_min;
+    int current_minutes = current_hour * 60 + current_minute;
+    
+    // Use cached parsed times
+    int sleep_minutes = sleep_hour_cached * 60 + sleep_minute_cached;
+    int wakeup_minutes = wakeup_hour_cached * 60 + wakeup_minute_cached;
+    
+    // Calculate minutes until wakeup
+    // Note: This function is only called when we're already in sleep period
+    int minutes_until_wakeup;
+    
+    if (sleep_minutes > wakeup_minutes) {
+        // Sleep period spans midnight (e.g., 23:00 to 06:00)
+        if (current_minutes >= sleep_minutes) {
+            // Currently before midnight (e.g., 23:30), wakeup is after midnight
+            minutes_until_wakeup = (24 * 60 - current_minutes) + wakeup_minutes;
+        } else {
+            // Currently after midnight (e.g., 01:00), wakeup is today
+            minutes_until_wakeup = wakeup_minutes - current_minutes;
+        }
+    } else {
+        // Sleep period is within same day (e.g., 01:00 to 05:00)
+        minutes_until_wakeup = wakeup_minutes - current_minutes;
+    }
+    
+    // Only enter deep sleep if we have at least 5 minutes until wakeup
+    // (to avoid edge cases and allow time for processing)
+    if (minutes_until_wakeup >= 5) {
+        uint64_t sleep_duration_us = (uint64_t)minutes_until_wakeup * 60 * 1000000ULL;
+        
+        Serial.print("Entering deep sleep for ");
+        Serial.print(minutes_until_wakeup);
+        Serial.print(" minutes (until ");
+        Serial.print(wakeup_time);
+        Serial.println(")");
+        Serial.flush();  // Ensure message is sent before sleep
+        
+        // Configure wakeup timer
+        esp_sleep_enable_timer_wakeup(sleep_duration_us);
+        
+        // Enter deep sleep (device will reset on wakeup)
+        esp_deep_sleep_start();
+        
+        // Code never reaches here - device resets on wakeup
+    }
 }
 
 bool loadConfig() {
