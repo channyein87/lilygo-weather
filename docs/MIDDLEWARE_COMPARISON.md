@@ -106,7 +106,7 @@
   "weather": {
     "api_key": "abc123...xyz",
     "city": "Sydney",
-    "country": "AU",
+    "country": "Australia",
     "units": "metric"
   },
   "ntp": {
@@ -148,7 +148,7 @@
   "weather": {
     "api_key": "",
     "city": "Sydney",
-    "country": "AU",
+    "country": "Australia",
     "units": "metric"
   },
   "crypto": {

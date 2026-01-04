@@ -56,7 +56,7 @@ cp data/config.template.json data/config.json
   "weather": {
     "api_key": "YOUR_GOOGLE_MAPS_API_KEY",
     "city": "Sydney",
-    "country": "AU",
+    "country": "Australia",
     "units": "metric"
   },
   "ntp": {
@@ -205,7 +205,7 @@ Update: 27 Dec 2023 @ 14:30
 - Verify API key is correct and complete (no spaces)
 - Check Google Cloud Console - Weather API and Geocoding API enabled?
 - Verify city name in English (e.g., "London" not "Londres")
-- Verify country code is correct (2-letter ISO code)
+- Verify country name is correct (full country name, e.g., "Australia", "France")
 - Check if you've exceeded free tier API limits
 
 ### Display Blank
@@ -235,7 +235,7 @@ Update: 27 Dec 2023 @ 14:30
 |---------|-----|---------|-------|
 | API Key | `weather.api_key` | "AIzaSyBi1B070..." | Get from Google Cloud Console |
 | City | `weather.city` | "Sydney" | English name only |
-| Country Code | `weather.country` | "AU" | ISO 3166 (2 letters) |
+| Country | `weather.country` | "Australia" | Full country name (e.g. "Australia") |
 | Units | `weather.units` | "metric" | "metric" (°C) or "imperial" (°F) |
 
 ### Time Settings (NTP) - Required
@@ -418,7 +418,7 @@ Edit `data/config.json`:
 ```json
 "weather": {
   "city": "Paris",
-  "country": "FR"
+  "country": "France"
 }
 ```
 
@@ -529,7 +529,7 @@ Display updated.
 ### Basic Setup
 - [ ] Have WiFi SSID and password ready
 - [ ] Got OpenWeatherMap API key
-- [ ] Know your city name (English) and country code
+- [ ] Know your city name (English) and country name
 - [ ] Created `data/config.json` from template
 - [ ] Configured NTP server and timezone
 - [ ] Ran `pio run -t uploadfs`

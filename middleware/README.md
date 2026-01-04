@@ -108,7 +108,7 @@ python app.py
 
 ## Documentation
 
-See [MIDDLEWARE_SETUP.md](MIDDLEWARE_SETUP.md) for detailed setup instructions, deployment on Raspberry Pi, troubleshooting, and more.
+See [MIDDLEWARE_SETUP.md](../docs/MIDDLEWARE_SETUP.md) for detailed setup instructions, deployment on Raspberry Pi, troubleshooting, and more.
 
 ## Requirements
 
