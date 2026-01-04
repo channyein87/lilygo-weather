@@ -306,7 +306,7 @@ boards/
 └── T5-ePaper-S3.json       # Board definition
 lib/
 ├── fonts/                   # Lexend font family
-└── icons/                   # OpenWeatherMap weather icons
+└── icons/                   # Weather icons
 platformio.ini              # Build configuration (ready to use)
 README.md                   # This file
 CONFIG_SETUP.md             # Detailed configuration guide
@@ -324,7 +324,7 @@ LilyGo_API_Reference.md     # Display library API documentation
 │  Display Board  │
 └─────────────────┘
         │
-        ├─────────► OpenWeatherMap API
+        ├─────────► Google Weather API
         ├─────────► CoinGecko API
         ├─────────► MarketStack API
         └─────────► Transport NSW API
@@ -339,7 +339,7 @@ LilyGo_API_Reference.md     # Display library API documentation
 │  LILYGO T5      │
 │  Display Board  │──────► Middleware (1 request)
 └─────────────────┘              │
-                                 ├─────► OpenWeatherMap API
+                                  ├─────► Google Weather API
                                  ├─────► CoinGecko API
                                  ├─────► MarketStack API
                                  └─────► Transport NSW API
@@ -367,11 +367,11 @@ See [Middleware Setup Guide](middleware/MIDDLEWARE_SETUP.md) for details.
 
 ## API Information
 
-### OpenWeatherMap (Weather Data) - Required
-- **Website**: https://openweathermap.org/api
-- **Free Tier**: 1000 calls/day, 60 calls/minute
-- **Documentation**: https://openweathermap.org/current
-- **Endpoint**: `https://api.openweathermap.org/data/2.5/weather`
+### Google Weather (Weather Data) - Required
+- **Website**: https://mapsplatform.google.com/
+- **Free Tier**: Included with Google Maps Platform (limits apply)
+- **Documentation**: https://developers.google.com/maps/documentation/weather
+- **Endpoints**: Geocoding `https://maps.googleapis.com/maps/api/geocode/json`, Weather `https://weather.googleapis.com/v1/currentConditions:lookup`
 
 ### CoinGecko (Cryptocurrency Prices) - Optional
 - **Website**: https://www.coingecko.com/en/api
@@ -528,7 +528,7 @@ Display updated.
 
 ### Basic Setup
 - [ ] Have WiFi SSID and password ready
-- [ ] Got OpenWeatherMap API key
+- [ ] Got Google Maps API key with Weather API enabled
 - [ ] Know your city name (English) and country name
 - [ ] Created `data/config.json` from template
 - [ ] Configured NTP server and timezone
@@ -553,7 +553,7 @@ Display updated.
 ## Links
 
 ### API Documentation
-- **OpenWeatherMap**: https://openweathermap.org/api
+- **Google Weather**: https://developers.google.com/maps/documentation/weather
 - **CoinGecko**: https://www.coingecko.com/en/api
 - **MarketStack**: https://marketstack.com/documentation
 - **Transport NSW**: https://opendata.transport.nsw.gov.au/documentation
@@ -578,4 +578,4 @@ Display updated.
 
 **Ready to start?** Copy `data/config.template.json` to `data/config.json`, edit your settings (at minimum: WiFi, weather API, and NTP), then run `pio run -t uploadfs && pio run -t upload`!
 
-**Note:** Only the OpenWeatherMap API key is required. CoinGecko, MarketStack, and Transport NSW APIs are optional features.
+**Note:** Only the Google Maps/Weather API key is required. CoinGecko, MarketStack, and Transport NSW APIs are optional features.

@@ -467,7 +467,7 @@ For issues or questions:
 
 ## Links
 
-- **OpenWeatherMap**: https://openweathermap.org/api
+- **Google Weather**: https://developers.google.com/maps/documentation/weather
 - **CoinGecko**: https://www.coingecko.com/en/api
 - **MarketStack**: https://marketstack.com/
 - **Transport NSW**: https://opendata.transport.nsw.gov.au/

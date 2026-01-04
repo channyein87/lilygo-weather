@@ -113,7 +113,7 @@ See [MIDDLEWARE_SETUP.md](../docs/MIDDLEWARE_SETUP.md) for detailed setup instru
 ## Requirements
 
 - Docker & Docker Compose
-- At least one API key (OpenWeatherMap required)
+- At least one API key (Google Weather required)
 - Machine on the same WiFi network as the display board
 
 ## Support

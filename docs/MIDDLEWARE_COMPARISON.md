@@ -174,7 +174,7 @@
 
 ### Direct API Mode (per update cycle)
 ```
-Display → OpenWeatherMap     (2-4 seconds)
+Display → Google Weather     (2-4 seconds)
 Display → CoinGecko          (1-2 seconds)
 Display → MarketStack        (2-3 seconds)
 Display → Transport NSW      (2-4 seconds)
@@ -185,7 +185,7 @@ Total WiFi Active: ~10-15 seconds
 ### Middleware Mode (per update cycle)
 ```
 Display → Middleware         (1-2 seconds)
-  ├─ Middleware → OpenWeatherMap
+  ├─ Middleware → Google Weather
   ├─ Middleware → CoinGecko
   ├─ Middleware → MarketStack
   └─ Middleware → Transport NSW

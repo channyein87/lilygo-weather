@@ -28,7 +28,7 @@
 /*
  * LILYGO T5 4.7" E-Paper Display - Weather Display
  * 
- * Connects to WiFi and fetches weather data from OpenWeatherMap API
+ * Connects to WiFi and fetches weather data from Google Weather API
  * Displays current weather, temperature, and forecast on e-paper display
  * 
  * Configuration is read from config.json (stored in LittleFS)
@@ -43,8 +43,8 @@ String password = "";
 bool middleware_enabled = false;
 String middleware_url = "";
 
-// OpenWeatherMap API (loaded from config.json)
-String owm_api_key = "";
+// Google Weather API (loaded from config.json)
+String google_api_key = "";
 String city = "";
 String country_code = "";
 String units = "";
@@ -564,7 +564,7 @@ void fetchWeatherData() {
     // Step 1: Get latitude and longitude using Geocoding API
     String geocode_url = String("https://maps.googleapis.com/maps/api/geocode/json?address=") + 
                          city + "," + country_code + 
-                         "&key=" + owm_api_key;
+                         "&key=" + google_api_key;
     
     Serial.println("Geocoding URL: " + geocode_url);
     
@@ -616,7 +616,7 @@ void fetchWeatherData() {
     
     // Step 2: Get weather data using coordinates
     String weather_url = String("https://weather.googleapis.com/v1/currentConditions:lookup?key=") + 
-                         owm_api_key + 
+                         google_api_key + 
                          "&location.latitude=" + String(latitude, 6) + 
                          "&location.longitude=" + String(longitude, 6);
     
@@ -1384,7 +1384,7 @@ bool loadConfig() {
     }
     
     // Extract weather config
-    owm_api_key = doc["weather"]["api_key"].as<String>();
+    google_api_key = doc["weather"]["api_key"].as<String>();
     city = doc["weather"]["city"].as<String>();
     country_code = doc["weather"]["country"].as<String>();
     units = doc["weather"]["units"].as<String>();
@@ -1480,7 +1480,7 @@ bool loadConfig() {
         Serial.println(middleware_url);
     } else {
         // Direct API mode: validate required API keys
-        if (owm_api_key.isEmpty() || city.isEmpty()) {
+        if (google_api_key.isEmpty() || city.isEmpty()) {
             Serial.println("ERROR: Weather API configuration missing in config.json");
             return false;
         }
