@@ -25,8 +25,20 @@ Instead of the display board making 4+ API calls (weather, crypto, stock, train)
 - Fetches all data from upstream APIs
 - Processes and formats the data
 - Returns everything in one optimized response
+- **Caches stock data for 24 hours** to conserve MarketStack API quota (100 requests/month on free tier)
 
 **Result**: 2-3x battery life improvement! 🔋
+
+## API Caching
+
+### Stock Data Caching
+The MarketStack API (stock data) has strict rate limits on the free tier:
+- **Free tier limit**: 100 requests per month (~3 per day)
+- **Cache duration**: 24 hours
+- **Behavior**: First request of the day fetches fresh data, subsequent requests return cached data
+- **Fallback**: If API fails, returns stale cached data to ensure display continues working
+
+Other APIs (weather, crypto, train) are fetched on every request as they have more generous rate limits.
 
 ## API Endpoint
 

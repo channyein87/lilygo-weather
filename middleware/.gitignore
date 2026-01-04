@@ -13,3 +13,4 @@ build/
 venv/
 config/config.json
 *.log
+test_*.py
