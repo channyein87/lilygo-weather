@@ -1076,6 +1076,18 @@ bool parseTime(const String& time_str, int& hour, int& minute) {
     String hour_str = time_str.substring(0, 2);
     String minute_str = time_str.substring(3, 5);
     
+    // Validate that hour and minute strings contain only digits
+    for (int i = 0; i < hour_str.length(); i++) {
+        if (!isDigit(hour_str.charAt(i))) {
+            return false;
+        }
+    }
+    for (int i = 0; i < minute_str.length(); i++) {
+        if (!isDigit(minute_str.charAt(i))) {
+            return false;
+        }
+    }
+    
     hour = hour_str.toInt();
     minute = minute_str.toInt();
     
@@ -1223,10 +1235,12 @@ bool loadConfig() {
         
         // Enable sleep schedule only if both sleep and wakeup times are provided
         if (!sleep_time.isEmpty() && !wakeup_time.isEmpty()) {
-            // Validate time format
-            int test_hour, test_minute;
-            if (parseTime(sleep_time, test_hour, test_minute) && 
-                parseTime(wakeup_time, test_hour, test_minute)) {
+            // Validate time format for both sleep and wakeup times
+            int sleep_hour, sleep_minute, wakeup_hour, wakeup_minute;
+            bool sleep_valid = parseTime(sleep_time, sleep_hour, sleep_minute);
+            bool wakeup_valid = parseTime(wakeup_time, wakeup_hour, wakeup_minute);
+            
+            if (sleep_valid && wakeup_valid) {
                 sleep_schedule_enabled = true;
                 Serial.println("Sleep schedule enabled");
                 Serial.print("Sleep time: ");
