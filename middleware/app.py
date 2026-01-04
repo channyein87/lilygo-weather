@@ -97,6 +97,18 @@ stock_cache = {
 # Cache duration: 24 hours
 STOCK_CACHE_DURATION = timedelta(hours=24)
 
+def _get_stale_cached_stock_data(error_type):
+    """
+    Helper function to retrieve stale cached stock data when API fails.
+    Returns cached data if available, otherwise None.
+    """
+    with stock_cache['lock']:
+        if stock_cache['data'] is not None:
+            cache_age = datetime.utcnow() - stock_cache['timestamp'] if stock_cache['timestamp'] else None
+            logger.warning(f"{error_type}, returning stale cached data (age: {cache_age})")
+            return stock_cache['data']
+    return None
+
 def fetch_weather_data():
     """Fetch weather data from OpenWeatherMap API"""
     try:
@@ -271,34 +283,28 @@ def fetch_stock_data():
         status_code = e.response.status_code if e.response else 'unknown'
         logger.error(f"HTTP error fetching stock data: {status_code} - {e}")
         
-        # If API call fails but we have cached data, return cached data even if stale
-        with stock_cache['lock']:
-            if stock_cache['data'] is not None:
-                cache_age = datetime.utcnow() - stock_cache['timestamp'] if stock_cache['timestamp'] else None
-                logger.warning(f"API error, returning stale cached data (age: {cache_age})")
-                return stock_cache['data']
+        # Try to return stale cached data as fallback
+        stale_data = _get_stale_cached_stock_data("API error")
+        if stale_data:
+            return stale_data
         
         return {'error': f'HTTP {status_code}: {str(e)}'}
     except requests.exceptions.RequestException as e:
         logger.error(f"Network error fetching stock data: {e}")
         
-        # If network error but we have cached data, return cached data even if stale
-        with stock_cache['lock']:
-            if stock_cache['data'] is not None:
-                cache_age = datetime.utcnow() - stock_cache['timestamp'] if stock_cache['timestamp'] else None
-                logger.warning(f"Network error, returning stale cached data (age: {cache_age})")
-                return stock_cache['data']
+        # Try to return stale cached data as fallback
+        stale_data = _get_stale_cached_stock_data("Network error")
+        if stale_data:
+            return stale_data
         
         return {'error': f'Network error: {str(e)}'}
     except Exception as e:
         logger.error(f"Error fetching stock data: {e}")
         
-        # If any error but we have cached data, return cached data even if stale
-        with stock_cache['lock']:
-            if stock_cache['data'] is not None:
-                cache_age = datetime.utcnow() - stock_cache['timestamp'] if stock_cache['timestamp'] else None
-                logger.warning(f"Unexpected error, returning stale cached data (age: {cache_age})")
-                return stock_cache['data']
+        # Try to return stale cached data as fallback
+        stale_data = _get_stale_cached_stock_data("Unexpected error")
+        if stale_data:
+            return stale_data
         
         return {'error': str(e)}
 
