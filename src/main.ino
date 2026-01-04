@@ -279,8 +279,7 @@ void loop() {
     // Check if we're in sleep period
     if (isInSleepPeriod()) {
         Serial.println("Display is in sleep period. Skipping update.");
-        // Use 30-second delay during sleep - balances power savings with wakeup responsiveness
-        // Checking every 30s means max 30s delay before waking up, while still saving significant power
+        // Check every 30 seconds during sleep (balances power savings with wakeup responsiveness)
         delay(30000);
         return;
     }
@@ -1248,8 +1247,7 @@ bool loadConfig() {
             if (sleep_valid && wakeup_valid) {
                 // Check for invalid configuration: sleep and wakeup times are identical
                 if (sleep_hour == wakeup_hour && sleep_minute == wakeup_minute) {
-                    Serial.println("WARNING: Sleep and wakeup times are identical. Schedule disabled.");
-                    Serial.println("Sleep and wakeup times must be different.");
+                    Serial.println("WARNING: Sleep and wakeup times are identical. Schedule disabled (times must be different).");
                     sleep_schedule_enabled = false;
                 } else {
                     // Cache parsed values to avoid redundant parsing in isInSleepPeriod()
