@@ -95,7 +95,7 @@ Users must create `data/config.json` from `data/config.template.json` with:
   "weather": {
     "api_key": "YOUR_GOOGLE_MAPS_API_KEY",
     "city": "Sydney",
-    "country": "AU",
+    "country": "Australia",
     "units": "metric"
   },
   "ntp": {
