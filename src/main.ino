@@ -221,6 +221,16 @@ void setup() {
         while (1) delay(1000);
     }
 
+    // Check if we're in sleep period BEFORE initializing display
+    // This prevents waking up too early and getting stuck in sleep loop
+    if (isInSleepPeriod()) {
+        Serial.println("Woke up during sleep period - going back to sleep");
+        enterDeepSleepUntilWakeup();
+        // If we didn't enter deep sleep (< 5 min until wakeup), delay and retry
+        delay(60000);  // Wait 1 minute
+        ESP.restart();  // Restart to check again
+    }
+
     // Allocate framebuffer (4 bits per pixel = EPD_WIDTH * EPD_HEIGHT / 2)
     framebuffer = (uint8_t *)ps_calloc(sizeof(uint8_t), EPD_DISPLAY_WIDTH * EPD_DISPLAY_HEIGHT / 2);
     if (!framebuffer) {
