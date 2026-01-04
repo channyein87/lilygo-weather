@@ -134,27 +134,61 @@ IconData getIconData(const String &condition_type, bool is_daytime) {
     String condition_lower = condition_type;
     condition_lower.toLowerCase();
     
-    // Check for thunderstorm conditions
-    if (condition_lower.indexOf("thunder") >= 0 || condition_lower.indexOf("storm") >= 0) {
+    // Check for thunderstorm conditions (but not snowstorm)
+    if (condition_lower.indexOf("thunder") >= 0) {
         return {thunderstorms_data, thunderstorms_width, thunderstorms_height};
     }
     
-    // Check for rain conditions
-    if (condition_lower.indexOf("rain") >= 0 || condition_lower.indexOf("drizzle") >= 0 || condition_lower.indexOf("shower") >= 0) {
-        return {rain_data, rain_width, rain_height};
-    }
-    
-    // Check for snow conditions
-    if (condition_lower.indexOf("snow") >= 0 || condition_lower.indexOf("ice") >= 0 || condition_lower.indexOf("freezing") >= 0) {
-        return {snow_data, snow_width, snow_height};
-    }
-    
-    // Check for hail
-    if (condition_lower.indexOf("hail") >= 0 || condition_lower.indexOf("sleet") >= 0) {
+    // Check for hail (check before rain since HAIL_SHOWERS contains "showers")
+    if (condition_lower.indexOf("hail") >= 0) {
         return {hail_data, hail_width, hail_height};
     }
     
-    // Check for clear conditions (day or night)
+    // Check for snow conditions (check before "storm" to handle SNOWSTORM)
+    if (condition_lower.indexOf("snow") >= 0 || condition_lower.indexOf("blowing_snow") >= 0) {
+        return {snow_data, snow_width, snow_height};
+    }
+    
+    // Check for thunderstorm by "storm" (after snow check to avoid catching SNOWSTORM)
+    if (condition_lower.indexOf("storm") >= 0) {
+        return {thunderstorms_data, thunderstorms_width, thunderstorms_height};
+    }
+    
+    // Check for rain conditions (covers all rain and shower types)
+    if (condition_lower.indexOf("rain") >= 0 || condition_lower.indexOf("shower") >= 0 || condition_lower.indexOf("drizzle") >= 0) {
+        return {rain_data, rain_width, rain_height};
+    }
+    
+    // Check for mostly clear (before generic "clear" check)
+    if (condition_lower.indexOf("mostly_clear") >= 0) {
+        if (is_daytime) {
+            return {clear_day_data, clear_day_width, clear_day_height};
+        } else {
+            return {clear_night_data, clear_night_width, clear_night_height};
+        }
+    }
+    
+    // Check for partly cloudy (before generic "cloudy" check)
+    if (condition_lower.indexOf("partly") >= 0) {
+        // Use clear icon with sun for partly cloudy
+        if (is_daytime) {
+            return {clear_day_data, clear_day_width, clear_day_height};
+        } else {
+            return {clear_night_data, clear_night_width, clear_night_height};
+        }
+    }
+    
+    // Check for mostly cloudy (before generic "cloudy" check)
+    if (condition_lower.indexOf("mostly_cloudy") >= 0) {
+        return {cloudy_data, cloudy_width, cloudy_height};
+    }
+    
+    // Check for cloudy conditions (after specific cloudy variants)
+    if (condition_lower.indexOf("cloud") >= 0 || condition_lower.indexOf("overcast") >= 0) {
+        return {cloudy_data, cloudy_width, cloudy_height};
+    }
+    
+    // Check for clear conditions (after mostly_clear)
     if (condition_lower.indexOf("clear") >= 0 || condition_lower.indexOf("sunny") >= 0) {
         if (is_daytime) {
             return {clear_day_data, clear_day_width, clear_day_height};
@@ -163,12 +197,7 @@ IconData getIconData(const String &condition_type, bool is_daytime) {
         }
     }
     
-    // Check for cloudy conditions
-    if (condition_lower.indexOf("cloud") >= 0 || condition_lower.indexOf("overcast") >= 0) {
-        return {cloudy_data, cloudy_width, cloudy_height};
-    }
-    
-    // Check for windy conditions
+    // Check for windy conditions (last weather check)
     if (condition_lower.indexOf("wind") >= 0 || condition_lower.indexOf("breezy") >= 0 || condition_lower.indexOf("gust") >= 0) {
         return {windy_data, windy_width, windy_height};
     }
